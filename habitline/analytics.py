@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable
 
-from management import Habit
+from repository import Habit
 
 
 @dataclass(frozen=True)

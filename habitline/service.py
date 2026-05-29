@@ -1,9 +1,9 @@
 from datetime import datetime
 from sqlite3 import Connection
 
-from analytics import HabitAnalysis, AggregateAnalysis
-from habitline.analytics import analyse_many, analyse_one, aggregate, HabitFilter, HabitComparator, AnalysisPeriod
-from management import HabitRepository, Periodicity, HabitIdentifier
+from analytics import HabitAnalysis, AggregateAnalysis, analyse_many, analyse_one, aggregate, HabitFilter, \
+    HabitComparator, AnalysisPeriod
+from repository import HabitRepository, Periodicity, HabitIdentifier
 
 
 class HabitService:
@@ -63,7 +63,8 @@ class HabitService:
         """
         self.__repository.complete(identifier, completed_at)
 
-    def get_many(self, filters: list[HabitFilter], comparator: HabitComparator, sort_asc: bool, period: AnalysisPeriod) -> \
+    def get_many(self, filters: list[HabitFilter], comparator: HabitComparator, sort_asc: bool,
+                 period: AnalysisPeriod) -> \
             list[HabitAnalysis]:
         """
         Retrieves habits from the database and returns analysis results for them with filtering, sorting, and period limitation for completions.
