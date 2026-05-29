@@ -57,8 +57,8 @@ def analyse_one(habit: Habit, period: AnalysisPeriod, now: datetime) -> HabitAna
     pass
 
 
-def analyse(habits: list[Habit], filters: list[HabitFilter], comparator: HabitComparator, sort_asc: bool,
-            period: AnalysisPeriod, now: datetime) -> list[HabitAnalysis]:
+def analyse_many(habits: list[Habit], filters: list[HabitFilter], comparator: HabitComparator, sort_asc: bool,
+                 period: AnalysisPeriod, now: datetime) -> list[HabitAnalysis]:
     """
     Analyses a list of habits with filtering, sorting, and period limitation for completions.
 

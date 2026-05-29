@@ -105,7 +105,7 @@ class HabitRepository:
         """
         pass
 
-    def read(self) -> list[Habit]:
+    def read_all(self) -> list[Habit]:
         """
         Reads all habits from the database.
 
