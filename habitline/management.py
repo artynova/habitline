@@ -53,6 +53,12 @@ class HabitRepository:
     """
 
     def __init__(self, connection: Connection):
+        """
+        Creates a new habit repository.
+        The database connection needs to be kept alive in order for the repository to function correctly.
+
+        :param connection: Database connection to use.
+        """
         self.__connection = connection
         self.__cursor = self.__connection.cursor()
 
