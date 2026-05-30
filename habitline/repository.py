@@ -6,8 +6,8 @@ from sqlite3 import Connection
 
 class Periodicity(Enum):
     """Habit periodicity."""
-    DAILY = 0,
-    WEEKLY = 1,
+    DAILY = 0
+    WEEKLY = 1
     UNKNOWN = auto()
 
 
