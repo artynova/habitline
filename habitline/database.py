@@ -21,14 +21,19 @@ def prepare_database(connection: Connection) -> None:
     :param connection: Database connection.
     :return: Nothing.
     """
-    pass
-
-
-def seed_database(connection: Connection) -> None:
-    """
-    Seeds the database with the predefined fixture data containing 5 habits with 4 weeks of example tracking data.
-
-    :param connection: Database connection.
-    :return: Nothing.
-    """
-    pass
+    cursor = connection.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON")
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS habit (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            periodicity INTEGER NOT NULL,
+            created_at INTEGER NOT NULL
+        )""")
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS completion (
+            habit_id INTEGER NOT NULL,
+            completed_at INTEGER NOT NULL,
+            PRIMARY KEY (habit_id, completed_at),
+            FOREIGN KEY (habit_id) REFERENCES habit
+        )""")
