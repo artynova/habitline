@@ -13,7 +13,7 @@ def make_test_habits(now: datetime) -> list[Habit]:
     :return: Nothing.
     """
     return [
-        Habit(1, "Journal", Periodicity.DAILY, at_time(offset_date(now, -29), 12, 40, 31), [
+        Habit(1, "Journal", Periodicity.DAILY, at_time(offset_date(now, -29), 12, 40, 31), (
             at_time(offset_date(now, -29), 19, 35, 17),
             at_time(offset_date(now, -28), 18, 2, 29),
             at_time(offset_date(now, -27), 17, 59, 54),
@@ -44,9 +44,9 @@ def make_test_habits(now: datetime) -> list[Habit]:
             at_time(offset_date(now, -2), 19, 27, 17),
             at_time(offset_date(now, -1), 20, 1, 20),
             at_time(now, 17, 33, 25),
-        ]),
+        )),
 
-        Habit(2, "Do morning exercise", Periodicity.DAILY, at_time(offset_date(now, -28), 8, 32, 19), [
+        Habit(2, "Do morning exercise", Periodicity.DAILY, at_time(offset_date(now, -28), 8, 32, 19), (
             at_time(offset_date(now, -28), 8, 45, 38),
             at_time(offset_date(now, -27), 9, 44, 49),
             at_time(offset_date(now, -26), 7, 12, 45),
@@ -64,40 +64,34 @@ def make_test_habits(now: datetime) -> list[Habit]:
             at_time(offset_date(now, -14), 7, 54, 20),
             at_time(offset_date(now, -13), 9, 14, 54),
             at_time(offset_date(now, -12), 7, 5, 39),
-            at_time(offset_date(now, -11), 7, 9, 48),
-            at_time(offset_date(now, -10), 9, 25, 10),
             at_time(offset_date(now, -9), 9, 46, 51),
             at_time(offset_date(now, -8), 8, 30, 49),
             at_time(offset_date(now, -6), 8, 38, 42),
             at_time(offset_date(now, -5), 9, 24, 2),
-            at_time(offset_date(now, -4), 7, 28, 52),
-            at_time(offset_date(now, -3), 7, 51, 41),
-            at_time(offset_date(now, -2), 7, 37, 3),
-            at_time(offset_date(now, -1), 8, 50, 6),
-            at_time(now, 8, 40, 42),
-        ]),
+        )),
 
-        Habit(3, "Call grandparents", Periodicity.WEEKLY, at_time(offset_date(now, -29), 14, 23, 58), [
-            at_time(offset_date(now, -23), 17, 23, 25),
-            at_time(offset_date(now, -16), 15, 21, 17),
-            at_time(offset_date(now, -9), 15, 53, 30),
-        ]),
+        Habit(3, "Call grandparents", Periodicity.WEEKLY, at_time(offset_date(now, -29), 14, 23, 58), (
+            at_time(offset_date(now, -22), 17, 23, 25),
+            at_time(offset_date(now, -15), 15, 21, 17),
+            at_time(offset_date(now, -8), 15, 53, 30),
+        )),
 
-        Habit(4, "Do laundry", Periodicity.WEEKLY, at_time(offset_date(now, -28), 17, 44, 5), [
+        Habit(4, "Do laundry", Periodicity.WEEKLY, at_time(offset_date(now, -28), 17, 44, 5), (
             at_time(offset_date(now, -28), 18, 1, 3),
             at_time(offset_date(now, -21), 19, 32, 12),
             at_time(offset_date(now, -14), 18, 57, 11),
             at_time(offset_date(now, -7), 21, 22, 12),
             at_time(now, 20, 58, 21),
-        ]),
+        )),
 
-        Habit(5, "Take a walk", Periodicity.DAILY, at_time(offset_date(now, -28), 11, 53, 27), [
+        Habit(5, "Take a walk", Periodicity.DAILY, at_time(offset_date(now, -28), 11, 53, 27), (
             at_time(offset_date(now, -28), 11, 35, 5),
             at_time(offset_date(now, -26), 12, 32, 17),
             at_time(offset_date(now, -25), 15, 11, 54),
             at_time(offset_date(now, -23), 11, 12, 41),
             at_time(offset_date(now, -20), 15, 30, 5),
             at_time(offset_date(now, -18), 12, 31, 8),
+            at_time(offset_date(now, -14), 9, 35, 10),
             at_time(offset_date(now, -14), 15, 21, 26),
             at_time(offset_date(now, -12), 14, 58, 27),
             at_time(offset_date(now, -11), 12, 30, 29),
@@ -106,12 +100,15 @@ def make_test_habits(now: datetime) -> list[Habit]:
             at_time(offset_date(now, -7), 11, 4, 25),
             at_time(offset_date(now, -6), 14, 1, 52),
             at_time(offset_date(now, -5), 14, 32, 10),
+            at_time(offset_date(now, -4), 10, 40, 12),
             at_time(offset_date(now, -4), 15, 1, 59),
             at_time(offset_date(now, -3), 12, 39, 48),
             at_time(offset_date(now, -2), 14, 5, 5),
             at_time(offset_date(now, -1), 12, 53, 56),
             at_time(now, 13, 50, 36),
-        ]),
+        )),
+
+        Habit(6, "Review financials", Periodicity.WEEKLY, at_time(offset_date(now, -28), 13, 22, 39), ()),
     ]
 
 
@@ -132,13 +129,13 @@ def insert_raw(connection: Connection, habits: list[Habit]) -> None:
     :param habits: Habits to insert.
     :return: Nothing.
     """
-    cursor = connection.cursor()
-    cursor.executemany("INSERT INTO habit(id, name, periodicity, created_at) VALUES (?, ?, ?, ?);",
-                       [(habit.id, habit.name, habit.periodicity.value, int(habit.created_at.timestamp())) for habit in
-                        habits])
-    cursor.executemany("INSERT INTO completion(habit_id, completed_at) VALUES (?, ?);",
-                       [(habit.id, int(completion.timestamp())) for habit in habits for completion in
-                        habit.completions])
+    connection.executemany("INSERT INTO habit(id, name, periodicity, created_at) VALUES (?, ?, ?, ?);",
+                           [(habit.id, habit.name, habit.periodicity.value, int(habit.created_at.timestamp())) for habit
+                            in
+                            habits])
+    connection.executemany("INSERT INTO completion(habit_id, completed_at) VALUES (?, ?);",
+                           [(habit.id, int(completion.timestamp())) for habit in habits for completion in
+                            habit.completions])
     connection.commit()
 
 
@@ -149,7 +146,6 @@ def clear_database(connection: Connection) -> None:
     :param connection: Database connection.
     :return: Nothing.
     """
-    cursor = connection.cursor()
-    cursor.execute("DELETE FROM completion")
-    cursor.execute("DELETE FROM habit")
+    connection.execute("DELETE FROM completion")
+    connection.execute("DELETE FROM habit")
     connection.commit()
