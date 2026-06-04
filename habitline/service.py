@@ -1,9 +1,9 @@
 from datetime import datetime
 from sqlite3 import Connection
 
-from analytics import HabitAnalysis, AggregateAnalysis, analyse_many, analyse_one, aggregate, HabitFilter, \
-    HabitComparator, AnalysisPeriod
-from repository import HabitRepository, Periodicity, HabitIdentifier
+from habitline.analytics import HabitAnalysis, AggregateAnalysis, analyse_many, analyse_one, aggregate, \
+    HabitAnalysisFilter, HabitAnalysisOrder, AnalysisRange
+from habitline.repository import HabitRepository, Periodicity, HabitIdentifier
 
 
 class HabitService:
@@ -29,7 +29,7 @@ class HabitService:
         :param periodicity: Periodicity of the habit.
         :return: Nothing.
         """
-        self.__repository.create(name, periodicity)
+        self.__repository.create(name, periodicity, datetime.now())
 
     def edit(self, identifier: HabitIdentifier, name: str) -> None:
         """
@@ -52,48 +52,52 @@ class HabitService:
         """
         self.__repository.delete(identifier)
 
-    def complete(self, identifier: HabitIdentifier, completed_at: datetime) -> None:
+    def complete(self, identifier: HabitIdentifier) -> None:
         """
         Logs the completion of a habit.
         Raises an error if the habit cannot be found.
 
         :param identifier: Identifier of the habit - either numeric ID or name.
-        :param completed_at: Date and time the habit was completed.
         :return: Nothing.
         """
-        self.__repository.complete(identifier, completed_at)
+        self.__repository.complete(identifier, datetime.now())
 
-    def get_many(self, filters: list[HabitFilter], comparator: HabitComparator, sort_asc: bool,
-                 period: AnalysisPeriod) -> \
-            list[HabitAnalysis]:
+    def get_many(self, filters: list[HabitAnalysisFilter], order: HabitAnalysisOrder,
+                 analysis_range: AnalysisRange) -> list[HabitAnalysis]:
         """
-        Retrieves habits from the database and returns analysis results for them with filtering, sorting, and period limitation for completions.
+        Retrieves habits from the database and returns analysis results for them with filtering, sorting, and range limitation for completions.
 
+        :param filters: List of filters for analysed habits.
+        :param order: Analysed habit order.
+        :param analysis_range: Analysis range.
+        :param analysis_range: Analysis range.
         :return: List of habit analyses.
         """
         habits = self.__repository.read_all()
         now = datetime.now()
-        return analyse_many(habits, filters, comparator, sort_asc, period, now)
+        return analyse_many(habits, filters, order, analysis_range, now)
 
-    def get_one(self, identifier: HabitIdentifier, period: AnalysisPeriod) -> HabitAnalysis:
+    def get_one(self, identifier: HabitIdentifier, analysis_range: AnalysisRange) -> HabitAnalysis:
         """
-        Retrieves a habit from the database and returns analysis results for it with period limitation for completions.
+        Retrieves a habit from the database and returns analysis results for it with range limitation for completions.
         Raises an error if the habit cannot be found.
 
+        :param identifier: Identifier of the habit - either numeric ID or name.
+        :param analysis_range: Analysis range.
         :return: Habit analysis.
         """
         habit = self.__repository.read_one(identifier)
         now = datetime.now()
-        return analyse_one(habit, period, now)
+        return analyse_one(habit, analysis_range, now)
 
-    def analyse(self, filters: list[HabitFilter], period: AnalysisPeriod) -> AggregateAnalysis:
+    def analyse(self, filters: list[HabitAnalysisFilter], analysis_range: AnalysisRange) -> AggregateAnalysis:
         """
-        Determines aggregate metrics for a collection of habits with filtering and period limitation for completions.
+        Determines aggregate metrics for a collection of habits with filtering and range limitation for completions.
 
-        :param filters: List of filter functions for analysed habits.
-        :param period: Analysis period.
+        :param filters: List of filters for analysed habits.
+        :param analysis_range: Analysis range.
         :return: Results of aggregate analysis.
         """
         habits = self.__repository.read_all()
         now = datetime.now()
-        return aggregate(habits, filters, period, now)
+        return aggregate(habits, filters, analysis_range, now)
