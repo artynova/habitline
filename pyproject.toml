@@ -15,6 +15,13 @@ license-files = ["LICENSE*"]
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",
+    "pytest>=9.0.0"
+]
+
+[tool.pytest]
+addopts = ["-ra", "-q"]
+testpaths = [
+    "tests",
 ]
 
 [project.scripts]
