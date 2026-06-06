@@ -24,7 +24,7 @@ class Habit:
         name: Name of the habit.
         periodicity: Periodicity of the habit.
         created_at: Date and time the habit was created.
-        completions: List of dates and times of the habit's logged completions in chronological order.
+        completions: Tuple of dates and times of the habit's logged completions in chronological order.
     """
     id: int
     name: str
