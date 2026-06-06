@@ -130,50 +130,65 @@ def format_percentage(percentage: float) -> str:
     return f"{percentage:.1%}"
 
 
-def represent_habit(analysis: HabitAnalysis, show_completions: bool = False) -> str:
+def represent_habit(analysis: HabitAnalysis, analysis_limited: bool = False, show_completions: bool = False) -> str:
     """
     Represent the given habit analysis for user-facing output.
 
     :param analysis: Habit analysis.
+    :param analysis_limited: Whether the analysis time range is limited.
     :param show_completions: Whether to show the logged habit completions.
     :return: Representation string.
     """
     habit = analysis.habit
-    representation = f"ID:\t\t{habit.id}\n" + \
-                     f"Name:\t\t{habit.name}\n" + \
-                     f"Periodicity:\t{habit.periodicity.name.capitalize()}\n" + \
-                     f"Created at:\t{habit.created_at}\n" + \
-                     f"Current streak:\t{analysis.streak}\n" + \
-                     f"Longest streak:\t{analysis.longest_streak}\n" + \
-                     f"Failure rate:\t{format_percentage(analysis.failure_rate)}\n" + \
-                     f"Pending:\t{analysis.pending}"
+    analysis_limited_extra_tabs = "\t\t\t" if analysis_limited else ""
+    analysis_limited_extra_text = " in target time range" if analysis_limited else ""
+    representation = f"ID:{analysis_limited_extra_tabs}\t\t{habit.id}\n" + \
+                     f"Name:{analysis_limited_extra_tabs}\t\t{habit.name}\n" + \
+                     f"Periodicity:{analysis_limited_extra_tabs}\t{habit.periodicity.name.capitalize()}\n" + \
+                     f"Created at:{analysis_limited_extra_tabs}\t{habit.created_at}\n" + \
+                     f"Current streak{analysis_limited_extra_text}:\t{analysis.streak}\n" + \
+                     f"Longest streak{analysis_limited_extra_text}:\t{analysis.longest_streak}\n" + \
+                     f"Failure rate{analysis_limited_extra_text}:\t{format_percentage(analysis.failure_rate)}\n" + \
+                     f"Pending:{analysis_limited_extra_tabs}\t{analysis.pending}"
     if show_completions:
         representation += "\nCompletions:\n" + "\n".join([f"- {completion}" for completion in habit.completions])
 
     return representation
 
 
-@cli.command(help="View a habit.")
+@cli.command(help="Show a habit.")
 @click.argument("identifier")
 @click.option("--use-id", is_flag=True,
               help="Interpret the identifier as habit's numeric ID. In this case the identifier must be an integer.")
+@click.option("--analyse-from", type=click.DateTime(formats=["%Y-%m-%d"]),
+              help="Limit habit completion analysis to the time period starting at the given date. Date format is YYYY-MM-DD.")
+@click.option("--analyse-until", type=click.DateTime(formats=["%Y-%m-%d"]),
+              help="Limit habit completion analysis to the time period ending at the given date. Date format is YYYY-MM-DD.")
 @click.option("--show-completions", is_flag=True, help="Show logged habit completions.")
 @pass_connection
-def view(connection: Connection, identifier: str, use_id: bool, show_completions: bool):
+def show(connection: Connection, identifier: str, use_id: bool, analyse_from: datetime | None,
+         analyse_until: datetime | None,
+         show_completions: bool):
     """
     Shows detailed data of a specific habit.
 
     :param connection: Database connection.
     :param identifier: Habit identifier.
     :param use_id: Whether to interpret the identifier as a numeric ID.
+    :param analyse_from: Date and time from which to start the habit completion analysis period, if any.
+    :param analyse_until: Date and time at which to end the habit completion analysis period, if any.
     :param show_completions: Whether to show the logged habit completions.
     :return: Nothing.
     """
     habit_id = parse_identifier_input(identifier, use_id)
-    service = HabitService(connection)
-    habit = service.get_one(habit_id, AnalysisRange(None, None))
+    analysis_range = AnalysisRange(analyse_from.date() if analyse_from else None,
+                                   analyse_until.date() if analyse_until else None)
+    range_specified = bool(analyse_from or analyse_until)
 
-    click.echo(represent_habit(habit, show_completions))
+    service = HabitService(connection)
+    habit = service.get_one(habit_id, analysis_range)
+
+    click.echo(represent_habit(habit, range_specified, show_completions))
 
 
 class OrderOption(Enum):
@@ -262,14 +277,16 @@ def list_habits(connection: Connection, periodicity: Periodicity | None, pending
     """
     filters = make_habit_filters(periodicity, pending, search)
     order = make_habit_order(sort, asc)
-    analysis_range = AnalysisRange(analyse_from, analyse_until)
+    analysis_range = AnalysisRange(analyse_from.date() if analyse_from else None,
+                                   analyse_until.date() if analyse_until else None)
+    range_specified = bool(analyse_from or analyse_until)
 
     service = HabitService(connection)
     habits = service.get_many(filters, order, analysis_range)
 
     click.echo(f"Found {len(habits)} habits" + (":" if len(habits) > 1 else ""))
     for habit in habits:
-        click.echo("-" * 20 + "\n" + represent_habit(habit))
+        click.echo("-" * 20 + "\n" + represent_habit(habit, range_specified))
 
 
 @cli.command(help="Generate aggregate analysis of multiple habits.")
