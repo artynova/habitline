@@ -1,15 +1,15 @@
 from sqlite3 import connect, Connection
 
 
-def get_connection(path: str) -> Connection:
+def get_connection(string: str) -> Connection:
     """
-    Obtains the database connection based on the given database file path.
+    Obtains the database connection based on the given database connection string.
     Ensures that the database is ready for use.
 
-    :param path: Path to the database file.
+    :param string: Connection string, such as a path to the database file or ":memory:".
     :return: Database connection.
     """
-    connection = connect(path)
+    connection = connect(string)
     prepare_database(connection)
     return connection
 
