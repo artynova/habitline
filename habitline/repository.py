@@ -47,7 +47,16 @@ def get_identifier_column(identifier: HabitIdentifier) -> str:
     return "name"
 
 
-class HabitNotFoundException(Exception):
+class HabitRepositoryException(Exception):
+    """
+    Logical exception raised by HabitRepository.
+    """
+
+    def __init__(self, message):
+        super().__init__(message)
+
+
+class HabitNotFoundException(HabitRepositoryException):
     """
     Exception raised when a habit could not be found.
     """
@@ -59,7 +68,7 @@ class HabitNotFoundException(Exception):
             super().__init__(f'Could not find habit with name "{identifier}".')
 
 
-class HabitNameTakenException(Exception):
+class HabitNameTakenException(HabitRepositoryException):
     """
     Exception raised changing a habit's name to the given name would result in a name collision.
     """
@@ -110,9 +119,13 @@ class HabitRepository:
         :param name: New unique name of the habit.
         :return: Nothing.
         """
-        if not self.exists(identifier):
+        habit_with_identifier_id = self.get_habit_id_or_none(identifier)
+        # Case where the habit with the passed identifier does not exist.
+        if habit_with_identifier_id is None:
             raise HabitNotFoundException(identifier)
-        if self.exists(name):
+        habit_with_name_id = self.get_habit_id_or_none(name)
+        # Case where the habit with the passed target name already exists, and it is not the same habit.
+        if habit_with_name_id is not None and habit_with_identifier_id != habit_with_name_id:
             raise HabitNameTakenException(name)
         self.__connection.execute(f"UPDATE habit SET name = ? WHERE {get_identifier_column(identifier)} = ?",
                                   (name, identifier))
@@ -161,6 +174,19 @@ class HabitRepository:
         if result is None:
             raise HabitNotFoundException(identifier)
         return result[0]
+
+    def get_habit_id_or_none(self, identifier: HabitIdentifier) -> int | None:
+        """
+        Retrieves the numeric ID of the habit with the given identifier.
+        If the given identifier is a name, this serves to match it with the numeric identifier.
+
+        :param identifier: Habit identifier - either numeric ID or name.
+        :return: Numeric ID of the habit, or None if the habit cannot be found.
+        """
+        try:
+            return self.get_habit_id(identifier)
+        except HabitNotFoundException:
+            return None
 
     def exists(self, identifier: HabitIdentifier) -> bool:
         """
