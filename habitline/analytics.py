@@ -146,16 +146,18 @@ def analyse_one(habit: Habit, analysis_range: AnalysisRange, now: datetime) -> H
     resolved_end = min(analysis_range.end, now.date()) if analysis_range.end else now.date()
     true_range = AnalysisRange(get_period_start(resolved_start),
                                get_period_start(resolved_end) + timedelta(days=period_step - 1))
+    # Total periods in the analysed range, possibly counting the currently ongoing period.
     total_periods = ((true_range.end - true_range.start).days + 1) // period_step
     # If the present date falls within the last period of the range, that means the period is still ongoing.
-    past_periods = total_periods - 1 if now.date() >= get_period_start(true_range.end) else total_periods
+    last_range_period_is_current = get_period_start(true_range.end) == get_period_start(now.date())
+    past_periods = total_periods - 1 if last_range_period_is_current else total_periods
 
     # Case for new habits.
     if not habit.completions:
         # Since there are no completions, if the analysis period encompasses at least one past period, that period was
         # failed and the failure rate is 100%. If only the current period is included, however, then it has not been
         # failed, and there are no failed periods, meaning the failure rate is 0%.
-        return HabitAnalysis(habit, 0, 0, 1.0 if past_periods > 1 else 0.0, True)
+        return HabitAnalysis(habit, 0, 0, 1.0 if past_periods > 0 else 0.0, True)
 
     # Filter completions to only those that are in the analysed range.
     completions: list[datetime] = list(filter(
@@ -167,13 +169,13 @@ def analyse_one(habit: Habit, analysis_range: AnalysisRange, now: datetime) -> H
     # Case where no completions are to be analysed due to time range constraints, but the habit does have completions
     # and thus may or may not be pending.
     if not completions:
-        return HabitAnalysis(habit, 0, 0, 1.0 if past_periods > 1 else 0.0, habit_pending)
-    last_completion_period_is_current = get_period_start(completions[-1].date()) == get_period_start(now.date())
+        return HabitAnalysis(habit, 0, 0, 1.0 if past_periods > 0 else 0.0, habit_pending)
 
+    last_completion_period_is_current = get_period_start(completions[-1].date()) == get_period_start(now.date())
     completed_periods = 0
     streak = 0
     longest_streak = 0
-    # The period-advancing step requires that at least one previous completion exists, which is always true except
+    # The period-advancing step assumes that at least one previous completion exists, which is always true except
     # for the first completion. Therefore, the next_period_start is set to the next period relative to the first
     # completion, to ensure that the algorithm never attempts the step for the first completion.
     next_period_start = get_period_start(completions[0].date()) + timedelta(days=period_step)
@@ -184,7 +186,7 @@ def analyse_one(habit: Habit, analysis_range: AnalysisRange, now: datetime) -> H
             streak += 1
 
             # Find how many periods elapsed between the previous completion's period and this completion's period
-            # If more than 1, then some periods were skipped, and the streak has to be broken
+            # If more than 1, then some periods were skipped, and the streak has to be broken.
             new_next_period_start = get_period_start(completion.date()) + timedelta(days=period_step)
             period_diff = (new_next_period_start - next_period_start).days / period_step
             next_period_start = new_next_period_start
@@ -196,20 +198,29 @@ def analyse_one(habit: Habit, analysis_range: AnalysisRange, now: datetime) -> H
     completed_periods += 1
     streak += 1
     longest_streak = max(longest_streak, streak)
-    # Determine if the streak currently holds - true if there is no more than 1 period of difference between the end of
-    # the analysis time range and the last completion in the list. If the streak does not hold, it has to be reset.
-    if (get_period_start(true_range.end) - get_period_start(completions[-1].date())).days / period_step > 1:
+    # Determine if the streak currently holds.
+    # If the last range period is in the present, the streak should be preserved if only the last period does not have a
+    # completion since absence of completion in the current period is not a streak-breaking failure (the user can still
+    # complete it before the period ends). Therefore, the minimum number of periods needed in the difference is 2.
+    # If the last range period is in the past, then any period difference (1 or above) means streak-breaking failure
+    # since the user cannot go back to the past and retroactively complete the period.
+    min_periods_to_break_final_streak = 2 if last_range_period_is_current else 1
+    last_completion_to_end_period_diff = (get_period_start(true_range.end) - get_period_start(
+        completions[-1].date())).days / period_step
+    if last_completion_to_end_period_diff >= min_periods_to_break_final_streak:
         streak = 0
 
-    # If the final completion belongs to the currently ongoing period, then it is included in the completed_periods
-    # count, and this period should be subtracted to obtain the number of past completed periods.
+    # If the final completion belongs to the currently ongoing period, then its period is included in the
+    # completed_periods count, and this period should be subtracted to obtain the number of past completed periods.
     past_completed_periods = completed_periods - 1 if last_completion_period_is_current else completed_periods
-    return HabitAnalysis(habit, streak, longest_streak, (past_periods - past_completed_periods) / past_periods,
-                         habit_pending)
+    failure_rate = 0.0 if past_periods == 0 else (past_periods - past_completed_periods) / past_periods
+    return HabitAnalysis(habit, streak, longest_streak, failure_rate, habit_pending)
 
 
 def analyse_many(habits: list[Habit], filters: list[HabitAnalysisFilter], order: HabitAnalysisOrder,
-                 analysis_range: AnalysisRange, now: datetime) -> list[HabitAnalysis]:
+                 analysis_range: AnalysisRange, now: datetime,
+                 analyser: Callable[[Habit, AnalysisRange, datetime], HabitAnalysis] = analyse_one) -> list[
+    HabitAnalysis]:
     """
     Analyses a list of habits with filtering, sorting, and period limitation for completions.
 
@@ -218,9 +229,10 @@ def analyse_many(habits: list[Habit], filters: list[HabitAnalysisFilter], order:
     :param order: Analysed habit order. Ties created by this order will be broken using the habit creation date.
     :param analysis_range: Analysis range.
     :param now: Current date and time.
+    :param analyser: Function used to analyse one habit.
     :return: List of analysed habits.
     """
-    analysed_habits = [analyse_one(habit, analysis_range, now) for habit in habits]
+    analysed_habits = [analyser(habit, analysis_range, now) for habit in habits]
     filtered_analyses = filter(lambda habit: all([analysis_filter.fn(habit) for analysis_filter in filters]),
                                analysed_habits)
     # Pre-sort by the creation date so that, in case of ties in the main sort, the tied analyses are naturally ordered
@@ -230,7 +242,8 @@ def analyse_many(habits: list[Habit], filters: list[HabitAnalysisFilter], order:
 
 
 def aggregate(habits: list[Habit], filters: list[HabitAnalysisFilter], analysis_range: AnalysisRange,
-              now: datetime) -> AggregateAnalysis:
+              now: datetime, analyser: Callable[
+            [Habit, AnalysisRange, datetime], HabitAnalysis] = analyse_one) -> AggregateAnalysis:
     """
     Determines aggregate metrics for a list of habits with filtering and period limitation for completions.
 
@@ -238,15 +251,19 @@ def aggregate(habits: list[Habit], filters: list[HabitAnalysisFilter], analysis_
     :param filters: List of filters for analysed habits.
     :param analysis_range: Analysis period.
     :param now: Current date and time.
+    :param analyser: Function used to analyse one habit.
     :return: Results of aggregate analysis.
     """
-    analysed_habits = [analyse_one(habit, analysis_range, now) for habit in habits]
+    analysed_habits = [analyser(habit, analysis_range, now) for habit in habits]
     filtered_analyses: list[HabitAnalysis] = list(
         filter(lambda habit: all([analysis_filter.fn(habit) for analysis_filter in filters]), analysed_habits))
     habit_count = len(filtered_analyses)
+    if habit_count == 0:
+        # No habits means no failures.
+        return AggregateAnalysis(0, 0, 0, 0.0)
     current_longest_streak = reduce(lambda prev_longest, analysis: max(prev_longest, analysis.streak),
                                     filtered_analyses, 0)
     longest_streak = reduce(lambda prev_longest, analysis: max(prev_longest, analysis.longest_streak),
                             filtered_analyses, 0)
-    avg_success_rate = sum([analysis.failure_rate for analysis in filtered_analyses]) / habit_count
-    return AggregateAnalysis(habit_count, current_longest_streak, longest_streak, avg_success_rate)
+    avg_failure_rate = sum([analysis.failure_rate for analysis in filtered_analyses]) / habit_count
+    return AggregateAnalysis(habit_count, current_longest_streak, longest_streak, avg_failure_rate)
