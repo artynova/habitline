@@ -1,13 +1,14 @@
 from datetime import datetime
 from enum import Enum
 from sqlite3 import Connection
+from typing import Callable, TypeVar
 
 import click
 
 from fixtures.seed import make_test_habits, insert_raw, clear_database
 from habitline.analytics import AnalysisRange, HabitAnalysisFilter, HabitAnalysisOrder, HabitAnalysis
 from habitline.database import get_connection
-from habitline.repository import HabitIdentifier, Periodicity
+from habitline.repository import HabitIdentifier, Periodicity, HabitRepositoryException
 from habitline.service import HabitService
 
 DEFAULT_DB_PATH = "database.db"
@@ -47,6 +48,25 @@ def cli(context: click.Context, path: str):
     context.call_on_close(connection.close)
 
 
+T = TypeVar("T")
+
+
+def execute_habit_service_call(func: Callable[[], T]) -> T:
+    """
+    Executes the given arbitrary function, expected to interact with HabitService. Catches and repackages
+    HabitRepository-specific exceptions into Click exceptions for more user-friendly error handling.
+
+    Raises a Click exception if the function call results in a HabitRepositoryException.
+
+    :param func: Function to execute.
+    :return: Output of the function.
+    """
+    try:
+        return func()
+    except HabitRepositoryException as e:
+        raise click.ClickException(str(e))
+
+
 @cli.command(help="Create a new habit.")
 @click.argument("name")
 @click.argument("periodicity", type=click.Choice(Periodicity, case_sensitive=False))
@@ -58,7 +78,7 @@ def create(connection: Connection, name: str, periodicity: Periodicity):
     :return: Nothing.
     """
     service = HabitService(connection)
-    service.create(name, periodicity)
+    execute_habit_service_call(lambda: service.create(name, periodicity))
 
 
 @cli.command(help="Log habit completion.")
@@ -76,8 +96,9 @@ def complete(connection: Connection, identifier: str, use_id: bool):
     :return: Nothing.
     """
     habit_id = parse_identifier_input(identifier, use_id)
+
     service = HabitService(connection)
-    service.complete(habit_id)
+    execute_habit_service_call(lambda: service.complete(habit_id))
 
 
 @cli.command(help="Edit a habit.")
@@ -97,8 +118,9 @@ def edit(connection: Connection, identifier: str, name: str, use_id: bool):
     :return: Nothing.
     """
     habit_id = parse_identifier_input(identifier, use_id)
+
     service = HabitService(connection)
-    service.edit(habit_id, name)
+    execute_habit_service_call(lambda: service.edit(habit_id, name))
 
 
 @cli.command(help="Delete a habit.")
@@ -116,8 +138,9 @@ def delete(connection: Connection, identifier: str, use_id: bool):
     :return: Nothing.
     """
     habit_id = parse_identifier_input(identifier, use_id)
+
     service = HabitService(connection)
-    service.delete(habit_id)
+    execute_habit_service_call(lambda: service.delete(habit_id))
 
 
 def format_percentage(percentage: float) -> str:
@@ -167,8 +190,7 @@ def represent_habit(analysis: HabitAnalysis, analysis_limited: bool = False, sho
 @click.option("--show-completions", is_flag=True, help="Show logged habit completions.")
 @pass_connection
 def show(connection: Connection, identifier: str, use_id: bool, analyse_from: datetime | None,
-         analyse_until: datetime | None,
-         show_completions: bool):
+         analyse_until: datetime | None, show_completions: bool):
     """
     Shows detailed data of a specific habit.
 
@@ -186,7 +208,7 @@ def show(connection: Connection, identifier: str, use_id: bool, analyse_from: da
     range_specified = bool(analyse_from or analyse_until)
 
     service = HabitService(connection)
-    habit = service.get_one(habit_id, analysis_range)
+    habit = execute_habit_service_call(lambda: service.get_one(habit_id, analysis_range))
 
     click.echo(represent_habit(habit, range_specified, show_completions))
 
@@ -282,7 +304,7 @@ def list_habits(connection: Connection, periodicity: Periodicity | None, pending
     range_specified = bool(analyse_from or analyse_until)
 
     service = HabitService(connection)
-    habits = service.get_many(filters, order, analysis_range)
+    habits = execute_habit_service_call(lambda: service.get_many(filters, order, analysis_range))
 
     click.echo(f"Found {len(habits)} habits" + (":" if len(habits) > 1 else ""))
     for habit in habits:
@@ -318,7 +340,7 @@ def analyse(connection: Connection, periodicity: Periodicity | None, pending: bo
                                    analyse_until.date() if analyse_until else None)
 
     service = HabitService(connection)
-    analysis = service.analyse(filters, analysis_range)
+    analysis = execute_habit_service_call(lambda: service.analyse(filters, analysis_range))
 
     click.echo(f"Analysed habits:\t\t{analysis.habit_count}")
     click.echo(f"Current longest streak:\t\t{analysis.current_longest_streak} periods")
