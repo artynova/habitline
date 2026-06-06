@@ -32,7 +32,7 @@ def prepare_database(connection: Connection) -> None:
         )""")
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS completion (
+            id INTEGER PRIMARY KEY,
             habit_id INTEGER NOT NULL REFERENCES habit (id) ON DELETE CASCADE,
-            completed_at INTEGER NOT NULL,
-            PRIMARY KEY (habit_id, completed_at)
+            completed_at INTEGER NOT NULL
         )""")
