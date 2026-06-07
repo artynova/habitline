@@ -4,7 +4,10 @@ from unittest.mock import Mock
 import pytest
 from pytest_mock import MockerFixture
 
+from fixtures.seed import insert_raw, make_test_habits, make_test_habit_analyses, make_test_aggregate_analysis, \
+    clear_database
 from habitline.analytics import AnalysisRange, HabitAnalysis, HabitAnalysisFilter, HabitAnalysisOrder, AggregateAnalysis
+from habitline.database import get_connection
 from habitline.repository import Periodicity, HabitNameTakenException, HabitNotFoundException, HabitIdentifier, Habit
 from habitline.service import HabitService
 from tests.conftest import MOCK_NOW
@@ -383,3 +386,164 @@ class TestHabitService:
         mock_repository.read_all.assert_called_once()
         mock_aggregate.assert_called_once_with(habits, filters, analysis_range, mock_now)
         assert result == analysis
+
+
+@pytest.fixture()
+def service():
+    """
+    Creates a HabitService with a connection to a seeded in-memory SQLite database. The database is seeded with the
+    6 predefined habits that are provided by the debug seeding module, created with reference to the mock present date
+    and time.
+
+    :return: Service.
+    """
+    connection = get_connection(":memory:")
+    habits = make_test_habits(MOCK_NOW)
+    insert_raw(connection, habits)
+
+    # Provide the service instance to the test using the fixture.
+    yield HabitService(connection)
+
+    # Clean up.
+    connection.close()
+
+
+@pytest.fixture()
+def analyses():
+    """
+    Returns the 6 predefined habits and expected analyses that are provided by the debug seeding module, created with
+    reference to the mock present date and time.
+
+    :return: Habit analyses.
+    """
+    return make_test_habit_analyses(MOCK_NOW)
+
+
+@pytest.fixture()
+def aggregate_analysis():
+    """
+    Returns the expected aggregate analysis for the 6 predefined habits, provided by the debug seeding module.
+
+    :return: Aggregate analysis.
+    """
+    return make_test_aggregate_analysis()
+
+
+class TestHabitServiceIntegration:
+    """
+    Tests HabitService using integration tests, with a real (in-memory) SQLite database connection, real repository,
+    and real analytics module.
+    """
+
+    def test_create(self, service: HabitService, mock_now: datetime):
+        """
+        Tests HabitService.create.
+
+        :param service: Habit service with a connection to a seeded database.
+        :param mock_now: Mock current date and time.
+        :return: Nothing.
+        """
+        expected = HabitAnalysis(Habit(7, "Go to gym", Periodicity.WEEKLY, mock_now, ()), 0, 0, 0.0, True)
+
+        service.create("Go to gym", Periodicity.WEEKLY)
+        result = service.get_one("Go to gym", AnalysisRange(None, None))
+
+        assert result == expected
+
+    def test_edit(self, service: HabitService, analyses: list[HabitAnalysis], mock_now: datetime):
+        """
+        Tests HabitService.edit.
+
+        :param service: Habit service with a connection to a seeded database.
+        :param analyses: Test habit analyses based on the mock current date and time.
+        :param mock_now: Mock current date and time.
+        :return: Nothing.
+        """
+        original = analyses[3]
+        expected = HabitAnalysis(
+            Habit(original.habit.id, "Go to gym", original.habit.periodicity, original.habit.created_at,
+                  original.habit.completions), original.streak, original.longest_streak, original.failure_rate,
+            original.pending)
+
+        service.edit("Do laundry", "Go to gym")
+        result = service.get_one("Go to gym", AnalysisRange(None, None))
+
+        assert result == expected
+
+    def test_delete(self, service: HabitService, mock_now: datetime):
+        """
+        Tests HabitService.delete.
+
+        :param service: Habit service with a connection to a seeded database.
+        :param mock_now: Mock current date and time.
+        :return: Nothing.
+        """
+        service.delete("Do laundry")
+        with pytest.raises(HabitNotFoundException):
+            service.get_one("Do laundry", AnalysisRange(None, None))
+
+    def test_complete(self, service: HabitService, analyses: list[HabitAnalysis], mock_now: datetime):
+        """
+        Tests HabitService.complete.
+
+        :param service: Habit service with a connection to a seeded database.
+        :param analyses: Test habit analyses based on the mock current date and time.
+        :param mock_now: Mock current date and time.
+        :return: Nothing.
+        """
+        original = analyses[2]
+        expected_completions = tuple([*original.habit.completions, mock_now])
+        # Streak should change from original 0 to 1 and the habit should no longer be pending for the current period.
+        expected = HabitAnalysis(
+            Habit(original.habit.id, original.habit.name, original.habit.periodicity, original.habit.created_at,
+                  expected_completions), 1, original.longest_streak, original.failure_rate, False)
+
+        service.complete("Call grandparents")
+        result = service.get_one("Call grandparents", AnalysisRange(None, None))
+
+        assert result == expected
+
+    def test_get_one(self, service: HabitService, analyses: list[HabitAnalysis], mock_now: datetime):
+        """
+        Tests HabitService.get_one.
+
+        :param service: Habit service with a connection to a seeded database.
+        :param analyses: Test habit analyses based on the mock current date and time.
+        :param mock_now: Mock current date and time.
+        :return: Nothing.
+        """
+        result = service.get_one("Do morning exercise", AnalysisRange(None, None))
+
+        assert result == analyses[1]
+
+    def test_get_many(self, service: HabitService, analyses: list[HabitAnalysis], mock_now: datetime):
+        """
+        Tests HabitService.get_many.
+
+        :param service: Habit service with a connection to a seeded database.
+        :param analyses: Test habit analyses based on the mock current date and time.
+        :param mock_now: Mock current date and time.
+        :return: Nothing.
+        """
+        result = service.get_many([], HabitAnalysisOrder(lambda analysis: analysis.habit.id, True),
+                                  AnalysisRange(None, None))
+
+        assert result == analyses
+
+    def test_analyse(self, service: HabitService, aggregate_analysis: AggregateAnalysis, mock_now: datetime):
+        """
+        Tests HabitService.analyse.
+
+        :param service: Habit service with a connection to a seeded database.
+        :param aggregate_analysis: Test aggregate analysis.
+        :param mock_now: Mock current date and time.
+        :return: Nothing.
+        """
+        result = service.analyse([], AnalysisRange(None, None))
+
+        assert result.habit_count == aggregate_analysis.habit_count
+        assert result.current_longest_streak == aggregate_analysis.current_longest_streak
+        assert result.longest_streak == aggregate_analysis.longest_streak
+        # Necessary to do the approximate comparison because of the tiny imprecision introduced by floating-point
+        # arithmetic.
+        assert result.avg_failure_rate == pytest.approx(aggregate_analysis.avg_failure_rate)

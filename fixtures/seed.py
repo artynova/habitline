@@ -1,19 +1,33 @@
 from datetime import datetime, timedelta
 from sqlite3 import Connection
 
+from habitline.analytics import HabitAnalysis, AggregateAnalysis
 from habitline.repository import Habit, Periodicity
 
 
 def make_test_habits(now: datetime) -> list[Habit]:
     """
-    Generates 5 predefined habits with 4 weeks of example tracking data,
-    relative to the given date and time as the current moment.
+    Generates 6 predefined habits with at least 4 weeks of example tracking data, relative to the given date and time
+    as the current moment.
 
     :param now: Current date and time.
-    :return: Nothing.
+    :return: Test habits.
     """
+    analyses = make_test_habit_analyses(now)
+    return [analysis.habit for analysis in analyses]
+
+
+def make_test_habit_analyses(now: datetime) -> list[HabitAnalysis]:
+    """
+    Generates 6 predefined habits with at least 4 weeks of example tracking data, relative to the given date and time
+    as the current moment, and provides expected analysis data for each habit.
+
+    :param now: Current date and time.
+    :return: Test habit analyses with test habits and expected analysis results.
+    """
+    week_start = at_week_start(now)
     return [
-        Habit(1, "Journal", Periodicity.DAILY, at_time(offset_date(now, -29), 12, 40, 31), (
+        HabitAnalysis(Habit(1, "Journal", Periodicity.DAILY, at_time(offset_date(now, -29), 12, 40, 31), (
             at_time(offset_date(now, -29), 19, 35, 17),
             at_time(offset_date(now, -28), 18, 2, 29),
             at_time(offset_date(now, -27), 17, 59, 54),
@@ -44,9 +58,9 @@ def make_test_habits(now: datetime) -> list[Habit]:
             at_time(offset_date(now, -2), 19, 27, 17),
             at_time(offset_date(now, -1), 20, 1, 20),
             at_time(now, 17, 33, 25),
-        )),
+        )), 30, 30, 0.0, False),
 
-        Habit(2, "Do morning exercise", Periodicity.DAILY, at_time(offset_date(now, -28), 8, 32, 19), (
+        HabitAnalysis(Habit(2, "Do morning exercise", Periodicity.DAILY, at_time(offset_date(now, -28), 8, 32, 19), (
             at_time(offset_date(now, -28), 8, 45, 38),
             at_time(offset_date(now, -27), 9, 44, 49),
             at_time(offset_date(now, -26), 7, 12, 45),
@@ -68,23 +82,25 @@ def make_test_habits(now: datetime) -> list[Habit]:
             at_time(offset_date(now, -8), 8, 30, 49),
             at_time(offset_date(now, -6), 8, 38, 42),
             at_time(offset_date(now, -5), 9, 24, 2),
-        )),
+        )), 0, 17, 0.25, True),
 
-        Habit(3, "Call grandparents", Periodicity.WEEKLY, at_time(offset_date(now, -29), 14, 23, 58), (
-            at_time(offset_date(now, -22), 17, 23, 25),
-            at_time(offset_date(now, -15), 15, 21, 17),
-            at_time(offset_date(now, -8), 15, 53, 30),
-        )),
+        HabitAnalysis(
+            Habit(3, "Call grandparents", Periodicity.WEEKLY, at_time(offset_date(week_start, -29), 14, 23, 58), (
+                at_time(offset_date(week_start, -24), 17, 23, 25),
+                at_time(offset_date(week_start, -18), 15, 21, 17),
+                at_time(offset_date(week_start, -15), 15, 53, 30),
+                at_time(offset_date(week_start, -9), 13, 17, 25),
+            )), 0, 3, 0.4, True),
 
-        Habit(4, "Do laundry", Periodicity.WEEKLY, at_time(offset_date(now, -28), 17, 44, 5), (
-            at_time(offset_date(now, -28), 18, 1, 3),
-            at_time(offset_date(now, -21), 19, 32, 12),
-            at_time(offset_date(now, -14), 18, 57, 11),
-            at_time(offset_date(now, -7), 21, 22, 12),
+        HabitAnalysis(Habit(4, "Do laundry", Periodicity.WEEKLY, at_time(offset_date(week_start, -28), 17, 44, 5), (
+            at_time(offset_date(week_start, -28), 18, 1, 3),
+            at_time(offset_date(week_start, -21), 19, 32, 12),
+            at_time(offset_date(week_start, -14), 18, 57, 11),
+            at_time(offset_date(week_start, -7), 21, 22, 12),
             at_time(now, 20, 58, 21),
-        )),
+        )), 5, 5, 0.0, False),
 
-        Habit(5, "Take a walk", Periodicity.DAILY, at_time(offset_date(now, -28), 11, 53, 27), (
+        HabitAnalysis(Habit(5, "Take a walk", Periodicity.DAILY, at_time(offset_date(now, -28), 11, 53, 27), (
             at_time(offset_date(now, -28), 11, 35, 5),
             at_time(offset_date(now, -26), 12, 32, 17),
             at_time(offset_date(now, -25), 15, 11, 54),
@@ -102,22 +118,60 @@ def make_test_habits(now: datetime) -> list[Habit]:
             at_time(offset_date(now, -5), 14, 32, 10),
             at_time(offset_date(now, -4), 10, 40, 12),
             at_time(offset_date(now, -4), 15, 1, 59),
-            at_time(offset_date(now, -3), 12, 39, 48),
             at_time(offset_date(now, -2), 14, 5, 5),
             at_time(offset_date(now, -1), 12, 53, 56),
-            at_time(now, 13, 50, 36),
-        )),
+        )), 2, 4, 11.0 / 28.0, True),
 
-        Habit(6, "Review financials", Periodicity.WEEKLY, at_time(offset_date(now, -28), 13, 22, 39), ()),
+        HabitAnalysis(
+            Habit(6, "Review financials", Periodicity.WEEKLY, at_time(offset_date(week_start, -28), 13, 22, 39), ()),
+            0, 0, 1.0, True),
     ]
 
 
-def offset_date(ref: datetime, days: int) -> datetime:
-    return ref + timedelta(days=days)
+def make_test_aggregate_analysis() -> AggregateAnalysis:
+    """
+    Generates the expected aggregate analysis based on the 6 predefined habits with at least 4 weeks of example
+    tracking data.
+
+    Since the predefined data are designed in such a way that the distribution of dates follows the target pattern
+    regardless of the specific reference current date and time, analytics data (aggregate analytics in this case) does
+    not need the reference date.
+
+    :return: Expected aggregate analysis.
+    """
+    return AggregateAnalysis(6, 30, 30, 143.0 / 420.0)
 
 
-def at_time(ref: datetime, hour: int = 0, minute: int = 0, second: int = 0) -> datetime:
-    return datetime(ref.year, ref.month, ref.day, hour, minute, second)
+def offset_date(date_and_time: datetime, days: int) -> datetime:
+    """
+    Offsets the given date and time by the given number of days.
+
+    :param date_and_time: Date and time.
+    :param days: Number of days.
+    :return: Offset date and time.
+    """
+    return date_and_time + timedelta(days=days)
+
+
+def at_time(date_and_time: datetime, hour: int = 0, minute: int = 0, second: int = 0) -> datetime:
+    """
+    Takes the date from the given datetime object and creates a new object with the same date and given time.
+    :param date_and_time: Date and time.
+    :param hour: Hour.
+    :param minute: Minute.
+    :param second: Second.
+    :return: Date and time with the same date as input and specified time.
+    """
+    return datetime(date_and_time.year, date_and_time.month, date_and_time.day, hour, minute, second)
+
+
+def at_week_start(date_and_time: datetime) -> datetime:
+    """
+    Creates a new datetime object with the same time and with the date set to the start of the corresponding week.
+    :param date_and_time: Date and time.
+    :return: Date and time with the same time and date set at the start of the week.
+    """
+    return offset_date(date_and_time, -date_and_time.weekday())
 
 
 def insert_raw(connection: Connection, habits: list[Habit]) -> None:
