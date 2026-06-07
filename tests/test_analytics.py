@@ -8,7 +8,7 @@ from habitline.analytics import AnalysisRange, analyse_one, HabitAnalysisFilter,
     analyse_many, aggregate, AggregateAnalysis
 from habitline.repository import Periodicity, Habit
 from tests.conftest import make_mock_habit, make_mock_analysis, MOCK_STREAK, MOCK_LONGEST_STREAK, MOCK_FAILURE_RATE, \
-    MOCK_PENDING, HabitAnalysisResult, make_mock_analysis_result
+    MOCK_PENDING, MOCK_NOW, HabitAnalysisResult, make_mock_analysis_result
 
 
 def make_mock_analyse_one(id_result_map: dict[int, HabitAnalysisResult] | None = None) -> Callable[
@@ -116,20 +116,20 @@ class TestAnalytics:
         pytest.param(
             make_mock_habit(periodicity=Periodicity.DAILY, created_at=datetime(2026, 5, 14, 13, 30, 16),
                             completions=()),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(0, 0, 0.0, True),
             id="daily_new"),
         pytest.param(
             make_mock_habit(periodicity=Periodicity.DAILY, created_at=datetime(2026, 5, 10, 13, 30, 16),
                             completions=()),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(0, 0, 1.0, True),
             id="daily_no_completions"),
         pytest.param(
             make_mock_habit(periodicity=Periodicity.DAILY, created_at=datetime(2026, 5, 10, 13, 30, 16), completions=(
                     datetime(2026, 5, 12, 14, 56, 23),
             )),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(0, 1, 0.75, True),
             id="daily_one_completion"),
         pytest.param(
@@ -137,7 +137,7 @@ class TestAnalytics:
                     datetime(2026, 5, 12, 14, 56, 23),
                     datetime(2026, 5, 13, 13, 42, 21),
             )),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(2, 2, 0.5, True),
             id="daily_two_completions"),
         pytest.param(
@@ -146,7 +146,7 @@ class TestAnalytics:
                     datetime(2026, 5, 12, 14, 56, 23),
                     datetime(2026, 5, 13, 13, 42, 21),
             )),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(3, 3, 0.25, True),
             id="daily_streak_pending"),
         pytest.param(
@@ -156,7 +156,7 @@ class TestAnalytics:
                     datetime(2026, 5, 13, 13, 42, 21),
                     datetime(2026, 5, 14, 16, 20, 49),
             )),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(4, 4, 0.25, False),
             id="daily_streak_completed"),
         pytest.param(
@@ -164,7 +164,7 @@ class TestAnalytics:
                     datetime(2026, 5, 11, 12, 15, 40),
                     datetime(2026, 5, 12, 14, 56, 23),
             )),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(0, 2, 0.5, True),
             id="daily_streak_broken"),
         pytest.param(
@@ -175,7 +175,7 @@ class TestAnalytics:
                     datetime(2026, 5, 14, 16, 20, 49),
                     datetime(2026, 5, 14, 17, 16, 19),
             )),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(1, 2, 0.5, False),
             id="daily_streak_multiple_completions"),
 
@@ -186,7 +186,7 @@ class TestAnalytics:
                     datetime(2026, 5, 12, 14, 56, 23),
                     datetime(2026, 5, 13, 13, 42, 21),
             )),
-            AnalysisRange(date(2026, 5, 12), None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 5, 12), None), MOCK_NOW,
             HabitAnalysisResult(2, 2, 0.0, True),
             id="daily_limit_start"),
         pytest.param(
@@ -195,7 +195,7 @@ class TestAnalytics:
                     datetime(2026, 5, 12, 14, 56, 23),
                     datetime(2026, 5, 13, 13, 42, 21),
             )),
-            AnalysisRange(None, date(2026, 5, 12)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, date(2026, 5, 12)), MOCK_NOW,
             HabitAnalysisResult(2, 2, 1.0 / 3.0, True),
             id="daily_limit_end"),
         pytest.param(
@@ -205,7 +205,7 @@ class TestAnalytics:
                     datetime(2026, 5, 12, 17, 21, 54),
                     datetime(2026, 5, 13, 13, 42, 21),
             )),
-            AnalysisRange(date(2026, 5, 11), date(2026, 5, 12)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 5, 11), date(2026, 5, 12)), MOCK_NOW,
             HabitAnalysisResult(2, 2, 0.0, True),
             id="daily_limit_multiple_completions"),
         pytest.param(
@@ -214,7 +214,7 @@ class TestAnalytics:
                     datetime(2026, 5, 12, 14, 56, 23),
                     datetime(2026, 5, 13, 13, 42, 21),
             )),
-            AnalysisRange(date(2026, 4, 1), date(2026, 7, 13)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 4, 1), date(2026, 7, 13)), MOCK_NOW,
             # Analysis results equivalent to when no bounds are specified, because the implicit bounds chosen due to the excessive
             # interval are the creation date and the current date, respectively.
             HabitAnalysisResult(3, 3, 0.25, True),
@@ -226,7 +226,7 @@ class TestAnalytics:
                     datetime(2026, 5, 12, 14, 56, 23),
                     datetime(2026, 5, 13, 13, 42, 21),
             )),
-            AnalysisRange(date(2026, 5, 10), date(2026, 5, 10)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 5, 10), date(2026, 5, 10)), MOCK_NOW,
             HabitAnalysisResult(0, 0, 1.0, True),
             id="daily_limit_no_completions_past"),
         # The current period (day) with no completions does not count as a failure
@@ -236,7 +236,7 @@ class TestAnalytics:
                     datetime(2026, 5, 12, 14, 56, 23),
                     datetime(2026, 5, 13, 13, 42, 21),
             )),
-            AnalysisRange(date(2026, 5, 14), date(2026, 5, 14)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 5, 14), date(2026, 5, 14)), MOCK_NOW,
             HabitAnalysisResult(0, 0, 0.0, True),
             id="daily_limit_no_completions_now"),
         pytest.param(
@@ -245,7 +245,7 @@ class TestAnalytics:
                     datetime(2026, 5, 12, 14, 56, 23),
                     datetime(2026, 5, 14, 16, 20, 49),
             )),
-            AnalysisRange(date(2026, 5, 14), date(2026, 5, 14)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 5, 14), date(2026, 5, 14)), MOCK_NOW,
             HabitAnalysisResult(1, 1, 0.0, False),
             id="daily_limit_completed_now"),
         pytest.param(
@@ -254,7 +254,7 @@ class TestAnalytics:
                     datetime(2026, 5, 12, 14, 56, 23),
                     datetime(2026, 5, 13, 13, 42, 21),
             )),
-            AnalysisRange(date(2026, 5, 11), date(2026, 5, 13)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 5, 11), date(2026, 5, 13)), MOCK_NOW,
             HabitAnalysisResult(3, 3, 0.0, True),
             id="daily_limit_streak_past"),
         pytest.param(
@@ -262,7 +262,7 @@ class TestAnalytics:
                     datetime(2026, 5, 11, 12, 15, 40),
                     datetime(2026, 5, 12, 14, 56, 23),
             )),
-            AnalysisRange(date(2026, 5, 11), date(2026, 5, 13)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 5, 11), date(2026, 5, 13)), MOCK_NOW,
             # The last day of the period (the 13th) lacks completions and, since it is in the past, should be
             # interpreted as a failure, and thus there also should not be any ongoing streak at the end.
             HabitAnalysisResult(0, 2, 1.0 / 3.0, True),
@@ -272,20 +272,20 @@ class TestAnalytics:
         pytest.param(
             make_mock_habit(periodicity=Periodicity.WEEKLY, created_at=datetime(2026, 5, 13, 13, 30, 16),
                             completions=()),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(0, 0, 0.0, True),
             id="weekly_new"),
         pytest.param(
             make_mock_habit(periodicity=Periodicity.WEEKLY, created_at=datetime(2026, 4, 17, 13, 30, 16),
                             completions=()),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(0, 0, 1.0, True),
             id="weekly_no_completions"),
         pytest.param(
             make_mock_habit(periodicity=Periodicity.WEEKLY, created_at=datetime(2026, 4, 17, 13, 30, 16), completions=(
                     datetime(2026, 4, 30, 14, 56, 23),
             )),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(0, 1, 0.75, True),
             id="weekly_one_completion"),
         pytest.param(
@@ -293,7 +293,7 @@ class TestAnalytics:
                     datetime(2026, 4, 30, 14, 56, 23),
                     datetime(2026, 5, 6, 13, 42, 21),
             )),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(2, 2, 0.5, True),
             id="weekly_two_completions"),
         pytest.param(
@@ -302,7 +302,7 @@ class TestAnalytics:
                     datetime(2026, 4, 30, 14, 56, 23),
                     datetime(2026, 5, 6, 13, 42, 21),
             )),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(3, 3, 0.25, True),
             id="weekly_streak_pending"),
         pytest.param(
@@ -312,7 +312,7 @@ class TestAnalytics:
                     datetime(2026, 5, 6, 13, 42, 21),
                     datetime(2026, 5, 13, 16, 20, 49),
             )),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(4, 4, 0.25, False),
             id="weekly_streak_completed"),
         pytest.param(
@@ -320,7 +320,7 @@ class TestAnalytics:
                     datetime(2026, 4, 22, 12, 15, 40),
                     datetime(2026, 4, 30, 14, 56, 23),
             )),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(0, 2, 0.5, True),
             id="weekly_streak_broken"),
         pytest.param(
@@ -331,7 +331,7 @@ class TestAnalytics:
                     datetime(2026, 5, 13, 16, 20, 49),
                     datetime(2026, 5, 14, 17, 16, 19),
             )),
-            AnalysisRange(None, None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, None), MOCK_NOW,
             HabitAnalysisResult(1, 2, 0.5, False),
             id="weekly_streak_multiple_completions"),
 
@@ -344,7 +344,7 @@ class TestAnalytics:
             )),
             # The analysis range starts after the completion on the 30th, but the start date falls into the same
             # period, so the completion on the 30th should be included.
-            AnalysisRange(date(2026, 5, 1), None), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 5, 1), None), MOCK_NOW,
             HabitAnalysisResult(2, 2, 0.0, True),
             id="weekly_limit_start"),
         pytest.param(
@@ -355,7 +355,7 @@ class TestAnalytics:
             )),
             # The analysis range ends before the completion on the 30th, but the end date falls into the same
             # period, so the completion on the 30th should be included.
-            AnalysisRange(None, date(2026, 4, 28)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(None, date(2026, 4, 28)), MOCK_NOW,
             HabitAnalysisResult(2, 2, 1.0 / 3.0, True),
             id="weekly_limit_end"),
         pytest.param(
@@ -367,7 +367,7 @@ class TestAnalytics:
             )),
             # Range bounds overlapping with corresponding period bounds (e.g., starting from Monday)
             # should work correctly too.
-            AnalysisRange(date(2026, 4, 20), date(2026, 5, 3)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 4, 20), date(2026, 5, 3)), MOCK_NOW,
             HabitAnalysisResult(2, 2, 0.0, True),
             id="weekly_limit_multiple_completions"),
         pytest.param(
@@ -376,7 +376,7 @@ class TestAnalytics:
                     datetime(2026, 4, 30, 14, 56, 23),
                     datetime(2026, 5, 6, 13, 42, 21),
             )),
-            AnalysisRange(date(2026, 4, 1), date(2026, 7, 13)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 4, 1), date(2026, 7, 13)), MOCK_NOW,
             # Analysis results equivalent to when no bounds are specified, because the implicit bounds chosen due to the excessive
             # interval are the creation date and the current date, respectively.
             HabitAnalysisResult(3, 3, 0.25, True),
@@ -387,7 +387,7 @@ class TestAnalytics:
                     datetime(2026, 4, 30, 14, 56, 23),
                     datetime(2026, 5, 6, 13, 42, 21),
             )),
-            AnalysisRange(date(2026, 4, 17), date(2026, 4, 18)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 4, 17), date(2026, 4, 18)), MOCK_NOW,
             HabitAnalysisResult(0, 0, 1.0, True),
             id="weekly_limit_no_completions_past"),
         pytest.param(
@@ -396,7 +396,7 @@ class TestAnalytics:
                     datetime(2026, 4, 30, 14, 56, 23),
                     datetime(2026, 5, 6, 13, 42, 21),
             )),
-            AnalysisRange(date(2026, 5, 13), date(2026, 5, 14)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 5, 13), date(2026, 5, 14)), MOCK_NOW,
             HabitAnalysisResult(0, 0, 0.0, True),
             id="weekly_limit_no_completions_now"),
         pytest.param(
@@ -405,7 +405,7 @@ class TestAnalytics:
                     datetime(2026, 5, 6, 13, 42, 21),
                     datetime(2026, 5, 13, 16, 20, 49),
             )),
-            AnalysisRange(date(2026, 5, 13), date(2026, 5, 14)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 5, 13), date(2026, 5, 14)), MOCK_NOW,
             HabitAnalysisResult(1, 1, 0.0, False),
             id="weekly_limit_completed_now"),
         pytest.param(
@@ -414,7 +414,7 @@ class TestAnalytics:
                     datetime(2026, 4, 30, 14, 56, 23),
                     datetime(2026, 5, 6, 13, 42, 21),
             )),
-            AnalysisRange(date(2026, 4, 20), date(2026, 5, 5)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 4, 20), date(2026, 5, 5)), MOCK_NOW,
             HabitAnalysisResult(3, 3, 0.0, True),
             id="weekly_limit_streak_past"),
         pytest.param(
@@ -422,7 +422,7 @@ class TestAnalytics:
                     datetime(2026, 4, 22, 12, 15, 40),
                     datetime(2026, 4, 30, 14, 56, 23),
             )),
-            AnalysisRange(date(2026, 4, 24), date(2026, 5, 7)), datetime(2026, 5, 14, 18, 12, 30),
+            AnalysisRange(date(2026, 4, 24), date(2026, 5, 7)), MOCK_NOW,
             # The last week of the period lacks completions and, since it is in the past, should be
             # interpreted as a failure, and thus there also should not be any ongoing streak at the end.
             HabitAnalysisResult(0, 2, 1.0 / 3.0, True),
@@ -501,7 +501,8 @@ class TestAnalytics:
             HabitAnalysisOrder.by_failure_rate(False), [4, 1],
             id="two_filters_order_failure_rate_reversed"),
     ])
-    def test_analyse_many(self, habits: list[Habit], analyser: Callable[[Habit, AnalysisRange, datetime], HabitAnalysis],
+    def test_analyse_many(self, habits: list[Habit],
+                          analyser: Callable[[Habit, AnalysisRange, datetime], HabitAnalysis],
                           filters: list[HabitAnalysisFilter], order: HabitAnalysisOrder,
                           expected_ids_ordered: list[int]) -> None:
         """
@@ -516,13 +517,12 @@ class TestAnalytics:
         """
         spy_analyser = Mock(wraps=analyser)
         mock_range = AnalysisRange(date(2026, 4, 17), date(2026, 4, 22))
-        mock_now = datetime(2026, 5, 14, 18, 12, 30)
 
-        actual = analyse_many(habits, filters, order, mock_range, mock_now, spy_analyser)
+        actual = analyse_many(habits, filters, order, mock_range, MOCK_NOW, spy_analyser)
         actual_ids_ordered = [analysis.habit.id for analysis in actual]
 
         # Check that the analyser was called correctly. Using any order since order of individual analyses does not matter.
-        spy_analyser.assert_has_calls([call(habit, mock_range, mock_now) for habit in habits], any_order=True)
+        spy_analyser.assert_has_calls([call(habit, mock_range, MOCK_NOW) for habit in habits], any_order=True)
         # Check that the ordering of analyses (identity established by numeric IDs) matches the expected ordering.
         assert actual_ids_ordered == expected_ids_ordered
 
@@ -560,11 +560,10 @@ class TestAnalytics:
                        filters: list[HabitAnalysisFilter], expected: AggregateAnalysis):
         spy_analyser = Mock(wraps=analyser)
         mock_range = AnalysisRange(date(2026, 4, 17), date(2026, 4, 22))
-        mock_now = datetime(2026, 5, 14, 18, 12, 30)
 
-        actual = aggregate(habits, filters, mock_range, mock_now, spy_analyser)
+        actual = aggregate(habits, filters, mock_range, MOCK_NOW, spy_analyser)
 
         # Check that the analyser was called correctly. Using any order since order of individual analyses does not matter.
-        spy_analyser.assert_has_calls([call(habit, mock_range, mock_now) for habit in habits], any_order=True)
+        spy_analyser.assert_has_calls([call(habit, mock_range, MOCK_NOW) for habit in habits], any_order=True)
         # Check result validity.
         assert actual == expected

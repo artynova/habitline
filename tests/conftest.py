@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
+from sqlite3 import Connection, Cursor
+from unittest.mock import Mock, MagicMock
 
 from habitline.analytics import HabitAnalysis
 from habitline.repository import Periodicity, Habit
@@ -7,12 +9,13 @@ from habitline.repository import Periodicity, Habit
 MOCK_ID = 1
 MOCK_NAME = "Lorem ipsum"
 MOCK_PERIODICITY = Periodicity.DAILY
-MOCK_CREATED_AT = datetime(2026, 5, 13, 16, 38, 21)
+MOCK_CREATED_AT = datetime(2026, 5, 10, 16, 38, 21)
 MOCK_COMPLETIONS = ()
 MOCK_STREAK = 2
 MOCK_LONGEST_STREAK = 4
 MOCK_FAILURE_RATE = 1.0 / 3.0
 MOCK_PENDING = True
+MOCK_NOW = datetime(2026, 5, 14, 18, 12, 30)
 
 
 def make_mock_habit(id: int | None = None, name: str | None = None, periodicity: Periodicity | None = None,
