@@ -62,6 +62,19 @@ class HabitService:
         """
         self.__repository.complete(identifier, datetime.now())
 
+    def get_one(self, identifier: HabitIdentifier, analysis_range: AnalysisRange) -> HabitAnalysis:
+        """
+        Retrieves a habit from the database and returns analysis results for it with range limitation for completions.
+        Raises an error if the habit cannot be found.
+
+        :param identifier: Identifier of the habit - either numeric ID or name.
+        :param analysis_range: Analysis range.
+        :return: Habit analysis.
+        """
+        habit = self.__repository.read_one(identifier)
+        now = datetime.now()
+        return analyse_one(habit, analysis_range, now)
+
     def get_many(self, filters: list[HabitAnalysisFilter], order: HabitAnalysisOrder,
                  analysis_range: AnalysisRange) -> list[HabitAnalysis]:
         """
@@ -77,26 +90,13 @@ class HabitService:
         now = datetime.now()
         return analyse_many(habits, filters, order, analysis_range, now)
 
-    def get_one(self, identifier: HabitIdentifier, analysis_range: AnalysisRange) -> HabitAnalysis:
-        """
-        Retrieves a habit from the database and returns analysis results for it with range limitation for completions.
-        Raises an error if the habit cannot be found.
-
-        :param identifier: Identifier of the habit - either numeric ID or name.
-        :param analysis_range: Analysis range.
-        :return: Habit analysis.
-        """
-        habit = self.__repository.read_one(identifier)
-        now = datetime.now()
-        return analyse_one(habit, analysis_range, now)
-
     def analyse(self, filters: list[HabitAnalysisFilter], analysis_range: AnalysisRange) -> AggregateAnalysis:
         """
         Determines aggregate metrics for a collection of habits with filtering and range limitation for completions.
 
         :param filters: List of filters for analysed habits.
         :param analysis_range: Analysis range.
-        :return: Results of aggregate analysis.
+        :return: Aggregate analysis.
         """
         habits = self.__repository.read_all()
         now = datetime.now()

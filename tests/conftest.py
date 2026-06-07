@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from datetime import datetime
 from sqlite3 import Connection
-from unittest.mock import Mock
 
 import pytest
+from pytest_mock import MockerFixture
 
 from habitline.analytics import HabitAnalysis
 from habitline.repository import Periodicity, Habit
@@ -111,9 +111,15 @@ def make_mock_analysis(id: int | None = None, name: str | None = None, periodici
 
 
 @pytest.fixture(scope="function")
-def mock_connection():
-    mock_connection = Mock(spec=Connection)
-    mock_cursor = Mock()
+def mock_connection(mocker: MockerFixture):
+    """
+    Creates a mock database connection.
+
+    :param mocker: Mocker fixture.
+    :return: Mock database connection.
+    """
+    mock_connection = mocker.MagicMock(spec=Connection)
+    mock_cursor = mocker.MagicMock()
     mock_connection.cursor.return_value = mock_cursor
     mock_connection.execute.return_value = mock_cursor
     return mock_connection
