@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from typing import Callable
-from unittest.mock import call
+from unittest.mock import call, Mock
 
 import pytest
 from pytest_mock import MockerFixture
@@ -10,6 +10,17 @@ from habitline.analytics import AnalysisRange, analyse_one, HabitAnalysisFilter,
 from habitline.repository import Periodicity, Habit
 from tests.conftest import make_mock_habit, make_mock_analysis, MOCK_STREAK, MOCK_LONGEST_STREAK, MOCK_FAILURE_RATE, \
     MOCK_PENDING, MOCK_NOW, HabitAnalysisResult, make_mock_analysis_result
+
+
+@pytest.fixture()
+def mock_analyse_one(mocker: MockerFixture):
+    """
+    Patches the analyse_one analytics function with a mock and returns the mock.
+
+    :param mocker: Mocker fixture.
+    :return: Mock function.
+    """
+    return mocker.patch("habitline.analytics.analyse_one")
 
 
 def make_mock_analyse_one(id_result_map: dict[int, HabitAnalysisResult] | None = None) -> Callable[
@@ -502,13 +513,14 @@ class TestAnalytics:
             HabitAnalysisOrder.by_failure_rate(False), [4, 1],
             id="two_filters_order_failure_rate_reversed"),
     ])
-    def test_analyse_many(self, mocker: MockerFixture, habits: list[Habit],
+    def test_analyse_many(self, mock_analyse_one: Mock, habits: list[Habit],
                           analyse_one_results: dict[int, HabitAnalysisResult],
                           filters: list[HabitAnalysisFilter], order: HabitAnalysisOrder,
                           expected_ids_ordered: list[int]) -> None:
         """
         Tests the analyse_many analytics function.
 
+        :param mock_analyse_one: Patched mock analyse_one function.
         :param habits: List of habits.
         :param analyse_one_results: Mapping of habit IDs to mock analyse_one results for the test.
         :param filters: List of filters for analysed habits.
@@ -517,8 +529,7 @@ class TestAnalytics:
         :return: Nothing.
         """
         mock_range = AnalysisRange(date(2026, 4, 17), date(2026, 4, 22))
-        mock_analyse_one = mocker.patch("habitline.analytics.analyse_one",
-                                        side_effect=make_mock_analyse_one(analyse_one_results))
+        mock_analyse_one.side_effect = make_mock_analyse_one(analyse_one_results)
 
         actual = analyse_many(habits, filters, order, mock_range, MOCK_NOW)
         actual_ids_ordered = [analysis.habit.id for analysis in actual]
@@ -559,11 +570,21 @@ class TestAnalytics:
              HabitAnalysisFilter.by_periodicity(Periodicity.DAILY)], AggregateAnalysis(3, 2, 4, 0.3),
             id="two_filters_one_custom"),
     ])
-    def test_aggregate(self, mocker: MockerFixture, habits: list[Habit], analyse_one_results: dict[int, HabitAnalysisResult],
+    def test_aggregate(self, mock_analyse_one: Mock, habits: list[Habit],
+                       analyse_one_results: dict[int, HabitAnalysisResult],
                        filters: list[HabitAnalysisFilter], expected: AggregateAnalysis):
+        """
+        Tests the analyse_many analytics function.
+
+        :param mock_analyse_one: Patched mock analyse_one function.
+        :param habits: List of habits.
+        :param analyse_one_results: Mapping of habit IDs to mock analyse_one results for the test.
+        :param filters: List of filters for analysed habits.
+        :param expected: Expected aggregate analysis.
+        :return: Nothing.
+        """
         mock_range = AnalysisRange(date(2026, 4, 17), date(2026, 4, 22))
-        mock_analyse_one = mocker.patch("habitline.analytics.analyse_one",
-                                        side_effect=make_mock_analyse_one(analyse_one_results))
+        mock_analyse_one.side_effect = make_mock_analyse_one(analyse_one_results)
 
         actual = aggregate(habits, filters, mock_range, MOCK_NOW)
 
