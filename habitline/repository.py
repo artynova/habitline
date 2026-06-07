@@ -33,6 +33,26 @@ class Habit:
     completions: tuple[datetime, ...]
 
 
+def periodicity_to_stored(periodicity: Periodicity) -> int:
+    """
+    Converts periodicity to an integer that can be stored in the database.
+
+    :param periodicity: Periodicity.
+    :return: Integer representing the periodicity.
+    """
+    return periodicity.value
+
+
+def datetime_to_stored(date_and_time: datetime) -> int:
+    """
+    Converts date and time to an integer that can be stored in the database (the POSIX timestamp).
+
+    :param date_and_time: Date and time.
+    :return: Integer representing the date and time.
+    """
+    return int(date_and_time.timestamp())
+
+
 def get_identifier_column(identifier: HabitIdentifier) -> str:
     """
     Determines the database column storing the given identifier type.
@@ -103,10 +123,10 @@ class HabitRepository:
         :param created_at: Date and time the habit was created.
         :return: Nothing.
         """
-        if self.exists(name):
+        if self.__exists(name):
             raise HabitNameTakenException(name)
         self.__connection.execute("INSERT INTO habit (name, periodicity, created_at) VALUES (?, ?, ?)",
-                                  (name, periodicity.value, int(created_at.timestamp())))
+                                  (name, periodicity_to_stored(periodicity), datetime_to_stored(created_at)))
         self.__connection.commit()
 
     def update(self, identifier: HabitIdentifier, name: str) -> None:
@@ -119,13 +139,18 @@ class HabitRepository:
         :param name: New unique name of the habit.
         :return: Nothing.
         """
-        habit_with_identifier_id = self.get_habit_id_or_none(identifier)
+        habit_with_identifier_id = self.__get_habit_id(identifier)
         # Case where the habit with the passed identifier does not exist.
         if habit_with_identifier_id is None:
             raise HabitNotFoundException(identifier)
-        habit_with_name_id = self.get_habit_id_or_none(name)
-        # Case where the habit with the passed target name already exists, and it is not the same habit.
-        if habit_with_name_id is not None and habit_with_identifier_id != habit_with_name_id:
+        habit_with_name_id = self.__get_habit_id(name)
+        # Case where the habit with the passed target name already exists.
+        if habit_with_name_id is not None:
+            # If this habit's ID and the ID of the habit with the target name are the same, that means this habit
+            # already has the target name. Therefore, we bail early.
+            if habit_with_identifier_id == habit_with_name_id:
+                return
+            # Otherwise, it is a different habit by which the name is already taken.
             raise HabitNameTakenException(name)
         self.__connection.execute(f"UPDATE habit SET name = ? WHERE {get_identifier_column(identifier)} = ?",
                                   (name, identifier))
@@ -140,7 +165,7 @@ class HabitRepository:
         :param identifier: Habit identifier - either numeric ID or name.
         :return: Nothing.
         """
-        if not self.exists(identifier):
+        if not self.__exists(identifier):
             raise HabitNotFoundException(identifier)
         self.__connection.execute(f"DELETE FROM habit WHERE {get_identifier_column(identifier)} = ?", (identifier,))
         self.__connection.commit()
@@ -155,27 +180,13 @@ class HabitRepository:
         :param completed_at: Date and time the habit was completed.
         :return: Nothing.
         """
-        habit_id = self.get_habit_id(identifier)
-        self.__connection.execute("INSERT INTO completion (habit_id, completed_at) VALUES (?, ?)",
-                                  (habit_id, int(completed_at.timestamp())))
-
-    def get_habit_id(self, identifier: HabitIdentifier) -> int:
-        """
-        Retrieves the numeric ID of the habit with the given identifier.
-        If the given identifier is a name, this serves to match it with the numeric identifier.
-
-        Raises an exception if the habit cannot be found, thus providing assurance that the habit exists.
-
-        :param identifier: Habit identifier - either numeric ID or name.
-        :return: Numeric ID of the habit.
-        """
-        result = self.__connection.execute(f"SELECT id FROM habit WHERE {get_identifier_column(identifier)} = ?",
-                                           (identifier,)).fetchone()
-        if result is None:
+        habit_id = self.__get_habit_id(identifier)
+        if habit_id is None:
             raise HabitNotFoundException(identifier)
-        return result[0]
+        self.__connection.execute("INSERT INTO completion (habit_id, completed_at) VALUES (?, ?)",
+                                  (habit_id, datetime_to_stored(completed_at)))
 
-    def get_habit_id_or_none(self, identifier: HabitIdentifier) -> int | None:
+    def __get_habit_id(self, identifier: HabitIdentifier) -> int | None:
         """
         Retrieves the numeric ID of the habit with the given identifier.
         If the given identifier is a name, this serves to match it with the numeric identifier.
@@ -183,48 +194,21 @@ class HabitRepository:
         :param identifier: Habit identifier - either numeric ID or name.
         :return: Numeric ID of the habit, or None if the habit cannot be found.
         """
-        try:
-            return self.get_habit_id(identifier)
-        except HabitNotFoundException:
+        result = self.__connection.execute(f"SELECT id FROM habit WHERE {get_identifier_column(identifier)} = ?",
+                                           (identifier,)).fetchone()
+        if result is None:
             return None
+        return result[0]
 
-    def exists(self, identifier: HabitIdentifier) -> bool:
+    def __exists(self, identifier: HabitIdentifier) -> bool:
         """
         Checks whether the habit with the given identifier exists.
 
         :param identifier: Habit identifier - either numeric ID or name.
         :return: Whether the habit exists.
         """
-        try:
-            self.get_habit_id(identifier)
-            return True
-        except HabitNotFoundException:
-            return False
-
-    def read_all(self) -> list[Habit]:
-        """
-        Reads all habits from the database.
-
-        :return: List of all habits.
-        """
-        # Query retrieves habit data joined with completions, providing flattened results with one row for each
-        # completion of a habit, to minimise the number of separate queries made to the database for optimisation
-        results = self.__connection.execute(f"""
-            SELECT habit.id, habit.name, habit.periodicity, habit.created_at, completion.completed_at
-            FROM habit LEFT JOIN completion ON habit.id = completion.habit_id
-            ORDER BY habit.id, completion.completed_at""").fetchall()
-        # Collect temporary habit records, including completion timestamp lists, from the flat query results
-        habit_records: dict[int, tuple[str, Periodicity, datetime, list[datetime]]] = dict()
-        for row in results:
-            if habit_records.get(row[0]) is None:
-                habit_records[row[0]] = (row[1], Periodicity(row[2]), datetime.fromtimestamp(row[3]), [])
-            # Record the completion if it is not NULL in the results. If it is NULL, then the row in question is
-            # the result of the LEFT JOIN and the completions for this habit are absent
-            if row[4]:
-                habit_records[row[0]][3].append(datetime.fromtimestamp(row[4]))
-        # Convert records to proper habit objects and return the resulting list
-        return [Habit(habit_id, record[0], record[1], record[2], tuple(record[3])) for habit_id, record in
-                habit_records.items()]
+        result = self.__get_habit_id(identifier)
+        return result is not None
 
     def read_one(self, identifier: HabitIdentifier) -> Habit:
         """
@@ -235,8 +219,8 @@ class HabitRepository:
         :param identifier: Habit identifier - either numeric ID or name.
         :return: Matched habit.
         """
-        # Flattened row structure similar to the one in read_all, but easier to handle since all completions
-        # belong to the same habit
+        # Query retrieves habit data joined with completions, providing flattened results with one row for each
+        # completion of the habit, to minimise the number of separate queries made to the database for optimisation.
         results = self.__connection.execute(f"""
             SELECT habit.id, habit.name, habit.periodicity, habit.created_at, completion.completed_at
             FROM habit LEFT JOIN completion ON habit.id = completion.habit_id
@@ -244,6 +228,36 @@ class HabitRepository:
             ORDER BY completion.completed_at""", (identifier,)).fetchall()
         if not results:
             raise HabitNotFoundException(identifier)
+        # The "if row[4]" condition is only True when the completion.completed_at value is not NULL, in which case
+        # the row corresponds to a join with an actual completion. If it is NULL, then it is produced by the left join
+        # for a habit without completions.
         habit_completions = [datetime.fromtimestamp(row[4]) for row in results if row[4]]
         return Habit(results[0][0], results[0][1], Periodicity(results[0][2]), datetime.fromtimestamp(results[0][3]),
                      tuple(habit_completions))
+
+    def read_all(self) -> list[Habit]:
+        """
+        Reads all habits from the database.
+
+        :return: List of all habits.
+        """
+        # Query retrieves habit data joined with completions, providing flattened results with one row for each
+        # completion of a habit, to minimise the number of separate queries made to the database for optimisation.
+        results = self.__connection.execute(f"""
+            SELECT habit.id, habit.name, habit.periodicity, habit.created_at, completion.completed_at
+            FROM habit LEFT JOIN completion ON habit.id = completion.habit_id
+            ORDER BY habit.id, completion.completed_at""").fetchall()
+        # Collect temporary habit records, including completion timestamp lists, from the flat query results
+        habit_records: dict[int, tuple[str, Periodicity, datetime, list[datetime]]] = dict()
+        for row in results:
+            if habit_records.get(row[0]) is None:
+                habit_records[row[0]] = (row[1], Periodicity(row[2]), datetime.fromtimestamp(row[3]), [])
+            # The "if row[4]" condition is only True when the completion.completed_at value is not NULL, in which case
+            # the row corresponds to a join with an actual completion. If it is NULL, then it is produced by the
+            # left join for a habit without completions.
+            if row[4]:
+                # Element at index 3 in the habit record is the parsed list of completions.
+                habit_records[row[0]][3].append(datetime.fromtimestamp(row[4]))
+        # Convert records to proper habit objects and return the resulting list
+        return [Habit(habit_id, record[0], record[1], record[2], tuple(record[3])) for habit_id, record in
+                habit_records.items()]

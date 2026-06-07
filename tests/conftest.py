@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from datetime import datetime
-from sqlite3 import Connection, Cursor
-from unittest.mock import Mock, MagicMock
+from sqlite3 import Connection
+from unittest.mock import Mock
+
+import pytest
 
 from habitline.analytics import HabitAnalysis
 from habitline.repository import Periodicity, Habit
@@ -106,3 +108,12 @@ def make_mock_analysis(id: int | None = None, name: str | None = None, periodici
                          longest_streak if longest_streak is not None else MOCK_LONGEST_STREAK,
                          failure_rate if failure_rate is not None else MOCK_FAILURE_RATE,
                          pending if pending is not None else MOCK_PENDING)
+
+
+@pytest.fixture(scope="function")
+def mock_connection():
+    mock_connection = Mock(spec=Connection)
+    mock_cursor = Mock()
+    mock_connection.cursor.return_value = mock_cursor
+    mock_connection.execute.return_value = mock_cursor
+    return mock_connection
