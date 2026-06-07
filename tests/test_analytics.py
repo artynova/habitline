@@ -1,8 +1,9 @@
 from datetime import datetime, date
 from typing import Callable
-from unittest.mock import Mock, call
+from unittest.mock import call
 
 import pytest
+from pytest_mock import MockerFixture
 
 from habitline.analytics import AnalysisRange, analyse_one, HabitAnalysisFilter, HabitAnalysis, HabitAnalysisOrder, \
     analyse_many, aggregate, AggregateAnalysis
@@ -447,12 +448,12 @@ class TestAnalytics:
         assert analysis.failure_rate == pytest.approx(expected_result.failure_rate)
         assert analysis.pending == expected_result.pending
 
-    @pytest.mark.parametrize(["habits", "analyser", "filters", "order", "expected_ids_ordered"], [
-        pytest.param([], make_mock_analyse_one(), [], NEUTRAL_ORDER, [], id="no_habits"),
+    @pytest.mark.parametrize(["habits", "analyse_one_results", "filters", "order", "expected_ids_ordered"], [
+        pytest.param([], {}, [], NEUTRAL_ORDER, [], id="no_habits"),
         pytest.param([
             make_mock_habit(id=1),
             make_mock_habit(id=2),
-        ], make_mock_analyse_one(), [HabitAnalysisFilter(lambda _analysis: False)], NEUTRAL_ORDER, [],
+        ], {}, [HabitAnalysisFilter(lambda _analysis: False)], NEUTRAL_ORDER, [],
             id="filter_to_no_habits"),
         pytest.param([
             make_mock_habit(id=1, periodicity=Periodicity.DAILY),
@@ -461,7 +462,7 @@ class TestAnalytics:
             make_mock_habit(id=4, periodicity=Periodicity.DAILY),
             make_mock_habit(id=5, periodicity=Periodicity.WEEKLY),
             make_mock_habit(id=6, periodicity=Periodicity.DAILY),
-        ], make_mock_analyse_one(),
+        ], {},
             [HabitAnalysisFilter(lambda analysis: analysis.habit.id % 2 == 0),
              HabitAnalysisFilter.by_periodicity(Periodicity.DAILY)],
             NEUTRAL_ORDER, [4, 6],
@@ -471,7 +472,7 @@ class TestAnalytics:
             make_mock_habit(id=1),
             make_mock_habit(id=4),
             make_mock_habit(id=2),
-        ], make_mock_analyse_one(),
+        ], {},
             [], HabitAnalysisOrder(lambda analysis: analysis.habit.id, True), [1, 2, 3, 4],
             id="order_id"),
         # Ensure that when an order produces ties, they are broken using creation date and time.
@@ -479,7 +480,7 @@ class TestAnalytics:
             make_mock_habit(id=1, created_at=datetime(2026, 4, 18, 13, 30, 16)),
             make_mock_habit(id=2, created_at=datetime(2026, 4, 19, 13, 30, 16)),
             make_mock_habit(id=3, created_at=datetime(2026, 4, 17, 13, 30, 16)),
-        ], make_mock_analyse_one(), [], NEUTRAL_ORDER, [3, 1, 2],
+        ], {}, [], NEUTRAL_ORDER, [3, 1, 2],
             id="order_neutral"),
         pytest.param([
             make_mock_habit(id=1, name="Write in journal", periodicity=Periodicity.DAILY),
@@ -488,50 +489,52 @@ class TestAnalytics:
             make_mock_habit(id=4, name="Write code", periodicity=Periodicity.DAILY),
             make_mock_habit(id=5, name="Write weekly goals", periodicity=Periodicity.WEEKLY),
             make_mock_habit(id=6, name="Stretch", periodicity=Periodicity.DAILY),
-        ], make_mock_analyse_one({
+        ], {
             1: make_mock_analysis_result(failure_rate=0.4),
             2: make_mock_analysis_result(failure_rate=0.6),
             3: make_mock_analysis_result(failure_rate=0.86),
             4: make_mock_analysis_result(failure_rate=0.64),
             5: make_mock_analysis_result(failure_rate=0.2),
             6: make_mock_analysis_result(failure_rate=0.7),
-        }),
+        },
             [HabitAnalysisFilter.by_search_match("wrIt"),
              HabitAnalysisFilter.by_periodicity(Periodicity.DAILY)],
             HabitAnalysisOrder.by_failure_rate(False), [4, 1],
             id="two_filters_order_failure_rate_reversed"),
     ])
-    def test_analyse_many(self, habits: list[Habit],
-                          analyser: Callable[[Habit, AnalysisRange, datetime], HabitAnalysis],
+    def test_analyse_many(self, mocker: MockerFixture, habits: list[Habit],
+                          analyse_one_results: dict[int, HabitAnalysisResult],
                           filters: list[HabitAnalysisFilter], order: HabitAnalysisOrder,
                           expected_ids_ordered: list[int]) -> None:
         """
         Tests the analyse_many analytics function.
 
         :param habits: List of habits.
-        :param analyser: Function used to analyse one habit.
+        :param analyse_one_results: Mapping of habit IDs to mock analyse_one results for the test.
         :param filters: List of filters for analysed habits.
         :param order: Analysed habit order.
         :param expected_ids_ordered: Ordered list of IDs of habits expected to be included in the analysis result in that order.
         :return: Nothing.
         """
-        spy_analyser = Mock(wraps=analyser)
         mock_range = AnalysisRange(date(2026, 4, 17), date(2026, 4, 22))
+        mock_analyse_one = mocker.patch("habitline.analytics.analyse_one",
+                                        side_effect=make_mock_analyse_one(analyse_one_results))
 
-        actual = analyse_many(habits, filters, order, mock_range, MOCK_NOW, spy_analyser)
+        actual = analyse_many(habits, filters, order, mock_range, MOCK_NOW)
         actual_ids_ordered = [analysis.habit.id for analysis in actual]
 
-        # Check that the analyser was called correctly. Using any order since order of individual analyses does not matter.
-        spy_analyser.assert_has_calls([call(habit, mock_range, MOCK_NOW) for habit in habits], any_order=True)
+        # Check that analyse_one was called correctly. Using any order since order of individual analyses does not
+        # matter.
+        mock_analyse_one.assert_has_calls([call(habit, mock_range, MOCK_NOW) for habit in habits], any_order=True)
         # Check that the ordering of analyses (identity established by numeric IDs) matches the expected ordering.
         assert actual_ids_ordered == expected_ids_ordered
 
-    @pytest.mark.parametrize(["habits", "analyser", "filters", "expected"], [
-        pytest.param([], make_mock_analyse_one(), [], AggregateAnalysis(0, 0, 0, 0.0), id="no_habits"),
+    @pytest.mark.parametrize(["habits", "analyse_one_results", "filters", "expected"], [
+        pytest.param([], {}, [], AggregateAnalysis(0, 0, 0, 0.0), id="no_habits"),
         pytest.param([
             make_mock_habit(id=1),
             make_mock_habit(id=2)
-        ], make_mock_analyse_one(), [HabitAnalysisFilter(lambda _analysis: False)], AggregateAnalysis(0, 0, 0, 0.0),
+        ], {}, [HabitAnalysisFilter(lambda _analysis: False)], AggregateAnalysis(0, 0, 0, 0.0),
             id="filter_to_no_habits"),
         pytest.param([
             make_mock_habit(id=1, periodicity=Periodicity.DAILY),
@@ -542,7 +545,7 @@ class TestAnalytics:
             make_mock_habit(id=6, periodicity=Periodicity.DAILY),
             make_mock_habit(id=7, periodicity=Periodicity.DAILY),
             make_mock_habit(id=8, periodicity=Periodicity.DAILY),
-        ], make_mock_analyse_one({
+        ], {
             1: HabitAnalysisResult(1, 3, 0.3, True),
             2: HabitAnalysisResult(0, 5, 0.51, False),
             3: HabitAnalysisResult(7, 7, 0.56, True),
@@ -551,19 +554,21 @@ class TestAnalytics:
             6: HabitAnalysisResult(1, 4, 0.65, True),
             7: HabitAnalysisResult(2, 5, 0.2, False),
             8: HabitAnalysisResult(0, 0, 0.0, True),
-        }),
+        },
             [HabitAnalysisFilter(lambda analysis: analysis.habit.id % 2 == 0),
              HabitAnalysisFilter.by_periodicity(Periodicity.DAILY)], AggregateAnalysis(3, 2, 4, 0.3),
             id="two_filters_one_custom"),
     ])
-    def test_aggregate(self, habits: list[Habit], analyser: Callable[[Habit, AnalysisRange, datetime], HabitAnalysis],
+    def test_aggregate(self, mocker: MockerFixture, habits: list[Habit], analyse_one_results: dict[int, HabitAnalysisResult],
                        filters: list[HabitAnalysisFilter], expected: AggregateAnalysis):
-        spy_analyser = Mock(wraps=analyser)
         mock_range = AnalysisRange(date(2026, 4, 17), date(2026, 4, 22))
+        mock_analyse_one = mocker.patch("habitline.analytics.analyse_one",
+                                        side_effect=make_mock_analyse_one(analyse_one_results))
 
-        actual = aggregate(habits, filters, mock_range, MOCK_NOW, spy_analyser)
+        actual = aggregate(habits, filters, mock_range, MOCK_NOW)
 
-        # Check that the analyser was called correctly. Using any order since order of individual analyses does not matter.
-        spy_analyser.assert_has_calls([call(habit, mock_range, MOCK_NOW) for habit in habits], any_order=True)
+        # Check that analyse_one was called correctly. Using any order since order of individual analyses does not
+        # matter.
+        mock_analyse_one.assert_has_calls([call(habit, mock_range, MOCK_NOW) for habit in habits], any_order=True)
         # Check result validity.
         assert actual == expected

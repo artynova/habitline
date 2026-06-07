@@ -218,8 +218,7 @@ def analyse_one(habit: Habit, analysis_range: AnalysisRange, now: datetime) -> H
 
 
 def analyse_many(habits: list[Habit], filters: list[HabitAnalysisFilter], order: HabitAnalysisOrder,
-                 analysis_range: AnalysisRange, now: datetime,
-                 analyser: Callable[[Habit, AnalysisRange, datetime], HabitAnalysis] = analyse_one) -> list[
+                 analysis_range: AnalysisRange, now: datetime) -> list[
     HabitAnalysis]:
     """
     Analyses a list of habits with filtering, sorting, and period limitation for completions.
@@ -229,10 +228,9 @@ def analyse_many(habits: list[Habit], filters: list[HabitAnalysisFilter], order:
     :param order: Analysed habit order. Ties created by this order will be broken using the habit creation date.
     :param analysis_range: Analysis range.
     :param now: Current date and time.
-    :param analyser: Function used to analyse one habit.
     :return: List of analysed habits.
     """
-    analysed_habits = [analyser(habit, analysis_range, now) for habit in habits]
+    analysed_habits = [analyse_one(habit, analysis_range, now) for habit in habits]
     filtered_analyses = filter(lambda habit: all([analysis_filter.fn(habit) for analysis_filter in filters]),
                                analysed_habits)
     # Pre-sort by the creation date so that, in case of ties in the main sort, the tied analyses are naturally ordered
@@ -242,8 +240,7 @@ def analyse_many(habits: list[Habit], filters: list[HabitAnalysisFilter], order:
 
 
 def aggregate(habits: list[Habit], filters: list[HabitAnalysisFilter], analysis_range: AnalysisRange,
-              now: datetime, analyser: Callable[
-            [Habit, AnalysisRange, datetime], HabitAnalysis] = analyse_one) -> AggregateAnalysis:
+              now: datetime) -> AggregateAnalysis:
     """
     Determines aggregate metrics for a list of habits with filtering and period limitation for completions.
 
@@ -251,10 +248,9 @@ def aggregate(habits: list[Habit], filters: list[HabitAnalysisFilter], analysis_
     :param filters: List of filters for analysed habits.
     :param analysis_range: Analysis period.
     :param now: Current date and time.
-    :param analyser: Function used to analyse one habit.
     :return: Results of aggregate analysis.
     """
-    analysed_habits = [analyser(habit, analysis_range, now) for habit in habits]
+    analysed_habits = [analyse_one(habit, analysis_range, now) for habit in habits]
     filtered_analyses: list[HabitAnalysis] = list(
         filter(lambda habit: all([analysis_filter.fn(habit) for analysis_filter in filters]), analysed_habits))
     habit_count = len(filtered_analyses)
