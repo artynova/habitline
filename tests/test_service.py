@@ -4,8 +4,7 @@ from unittest.mock import Mock
 import pytest
 from pytest_mock import MockerFixture
 
-from fixtures.seed import insert_raw, make_test_habits, make_test_habit_analyses, make_test_aggregate_analysis, \
-    clear_database
+from fixtures.seed import insert_raw, make_test_habits, make_test_habit_analyses, make_test_aggregate_analysis
 from habitline.analytics import AnalysisRange, HabitAnalysis, HabitAnalysisFilter, HabitAnalysisOrder, AggregateAnalysis
 from habitline.database import get_connection
 from habitline.repository import Periodicity, HabitNameTakenException, HabitNotFoundException, HabitIdentifier, Habit
@@ -14,58 +13,59 @@ from tests.conftest import MOCK_NOW
 
 
 @pytest.fixture()
-def mock_repository(mocker: MockerFixture):
+def patched_create_repository(mocker: MockerFixture, mock_repository: Mock):
     """
-    Patches the HabitRepository class to create a mock object and returns the mock.
+    Patches the HabitRepository class to create the mock repository object.
 
     :param mocker: Mocker fixture.
-    :return: Mock class.
+    :param mock_repository: Mock habit repository.
+    :return: Patched class.
     """
-    return mocker.patch('habitline.service.HabitRepository').return_value
+    return mocker.patch("habitline.service.HabitRepository", return_value=mock_repository)
 
 
 @pytest.fixture()
-def mock_now(mocker: MockerFixture):
+def patched_now(mocker: MockerFixture):
     """
-    Patches datetime.now to return a fixed datetime and returns that datetime.
+    Patches datetime.now to return the fixed mock current datetime.
 
     :param mocker: Mocker fixture.
-    :return: Mock value.
+    :return: Patched function.
     """
     mock_datetime = mocker.patch("habitline.service.datetime")
     mock_datetime.now.return_value = MOCK_NOW
-    return MOCK_NOW
+    return mock_datetime.now
 
 
 @pytest.fixture()
-def mock_analyse_one(mocker: MockerFixture):
+def patched_analyse_one(mocker: MockerFixture):
     """
     Patches the analyse_one analytics function with a mock and returns the mock.
 
     :param mocker: Mocker fixture.
-    :return: Mock function.
+    :return: Patched function.
     """
     return mocker.patch("habitline.service.analyse_one")
 
 
 @pytest.fixture()
-def mock_analyse_many(mocker: MockerFixture):
+def patched_analyse_many(mocker: MockerFixture):
     """
     Patches the analyse_many analytics function with a mock and returns the mock.
 
     :param mocker: Mocker fixture.
-    :return: Mock function.
+    :return: Patched function.
     """
     return mocker.patch("habitline.service.analyse_many")
 
 
 @pytest.fixture()
-def mock_aggregate(mocker: MockerFixture):
+def patched_aggregate(mocker: MockerFixture):
     """
     Patches the aggregate analytics function with a mock and returns the mock.
 
     :param mocker: Mocker fixture.
-    :return: Mock function.
+    :return: Patched function.
     """
     return mocker.patch("habitline.service.aggregate")
 
@@ -75,13 +75,15 @@ class TestHabitService:
     Tests HabitService with unit tests.
     """
 
-    def test_create_failure_name_taken(self, mock_connection: Mock, mock_repository: Mock, mock_now: datetime):
+    def test_create_failure_name_taken(self, mock_connection: Mock, mock_repository: Mock,
+                                       patched_create_repository: Mock, patched_now: Mock):
         """
         Tests HabitService.create failure outcome when the provided name is already assigned to another habit.
 
         :param mock_connection: Mock database connection.
-        :param mock_repository: Patched mock habit repository.
-        :param mock_now: Mock current date and time.
+        :param mock_repository: Mock habit repository.
+        :param patched_create_repository: Patched habit repository class.
+        :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
         name = "Journal"
@@ -92,15 +94,17 @@ class TestHabitService:
         with pytest.raises(HabitNameTakenException):
             service.create(name, periodicity)
 
-        mock_repository.create.assert_called_once_with(name, periodicity, mock_now)
+        mock_repository.create.assert_called_once_with(name, periodicity, MOCK_NOW)
 
-    def test_create_success(self, mock_connection: Mock, mock_repository: Mock, mock_now: datetime):
+    def test_create_success(self, mock_connection: Mock, mock_repository: Mock, patched_create_repository: Mock,
+                            patched_now: Mock):
         """
         Tests HabitService.create success outcome.
 
         :param mock_connection: Mock database connection.
-        :param mock_repository: Patched mock habit repository.
-        :param mock_now: Mock current date and time.
+        :param mock_repository: Mock habit repository.
+        :param patched_create_repository: Patched habit repository class.
+        :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
         name = "Journal"
@@ -109,19 +113,21 @@ class TestHabitService:
 
         service.create(name, periodicity)
 
-        mock_repository.create.assert_called_once_with(name, periodicity, mock_now)
+        mock_repository.create.assert_called_once_with(name, periodicity, MOCK_NOW)
 
     @pytest.mark.parametrize(["identifier"], [
         pytest.param(1, id="identifier_id"),
         pytest.param("Journal", id="identifier_name"),
     ])
     def test_edit_failure_habit_not_found(self, mock_connection: Mock, mock_repository: Mock,
+                                          patched_create_repository: Mock,
                                           identifier: HabitIdentifier):
         """
         Tests HabitService.edit failure outcome when trying to change the name of a non-existent habit.
 
         :param mock_connection: Mock database connection.
-        :param mock_repository: Patched mock habit repository.
+        :param mock_repository: Mock habit repository.
+        :param patched_create_repository: Patched habit repository class.
         :param identifier: Habit identifier.
         :return: Nothing.
         """
@@ -138,12 +144,14 @@ class TestHabitService:
         pytest.param(1, id="identifier_id"),
         pytest.param("Journal", id="identifier_name"),
     ])
-    def test_edit_failure_name_taken(self, mock_connection: Mock, mock_repository: Mock, identifier: HabitIdentifier):
+    def test_edit_failure_name_taken(self, mock_connection: Mock, mock_repository: Mock,
+                                     patched_create_repository: Mock, identifier: HabitIdentifier):
         """
         Tests HabitService.edit failure outcome when the provided new name is already assigned to another habit.
 
         :param mock_connection: Mock database connection.
-        :param mock_repository: Patched mock habit repository.
+        :param mock_repository: Mock habit repository.
+        :param patched_create_repository: Patched habit repository class.
         :param identifier: Habit identifier.
         :return: Nothing.
         """
@@ -160,12 +168,14 @@ class TestHabitService:
         pytest.param(1, id="identifier_id"),
         pytest.param("Journal", id="identifier_name"),
     ])
-    def test_edit_success(self, mock_connection: Mock, mock_repository: Mock, identifier: HabitIdentifier):
+    def test_edit_success(self, mock_connection: Mock, mock_repository: Mock, patched_create_repository: Mock,
+                          identifier: HabitIdentifier):
         """
         Tests HabitService.edit success outcome.
 
         :param mock_connection: Mock database connection.
-        :param mock_repository: Patched mock habit repository.
+        :param mock_repository: Mock habit repository.
+        :param patched_create_repository: Patched habit repository class.
         :param identifier: Habit identifier.
         :return: Nothing.
         """
@@ -181,12 +191,14 @@ class TestHabitService:
         pytest.param("Journal", id="identifier_name"),
     ])
     def test_delete_failure_habit_not_found(self, mock_connection: Mock, mock_repository: Mock,
+                                            patched_create_repository: Mock,
                                             identifier: HabitIdentifier):
         """
         Tests HabitService.delete failure outcome when trying to delete a non-existent habit.
 
         :param mock_connection: Mock database connection.
-        :param mock_repository: Patched mock habit repository.
+        :param mock_repository: Mock habit repository.
+        :param patched_create_repository: Patched habit repository class.
         :param identifier: Habit identifier.
         :return: Nothing.
         """
@@ -202,12 +214,14 @@ class TestHabitService:
         pytest.param(1, id="identifier_id"),
         pytest.param("Journal", id="identifier_name"),
     ])
-    def test_delete_success(self, mock_connection: Mock, mock_repository: Mock, identifier: HabitIdentifier):
+    def test_delete_success(self, mock_connection: Mock, mock_repository: Mock, patched_create_repository: Mock,
+                            identifier: HabitIdentifier):
         """
         Tests HabitService.delete success.
 
         :param mock_connection: Mock database connection.
-        :param mock_repository: Patched mock habit repository.
+        :param mock_repository: Mock habit repository.
+        :param patched_create_repository: Patched habit repository class.
         :param identifier: Habit identifier.
         :return: Nothing.
         """
@@ -221,13 +235,15 @@ class TestHabitService:
         pytest.param(1, id="identifier_id"),
         pytest.param("Journal", id="identifier_name"),
     ])
-    def test_complete_failure_habit_not_found(self, mock_connection: Mock, mock_repository: Mock, mock_now: datetime,
+    def test_complete_failure_habit_not_found(self, mock_connection: Mock, mock_repository: Mock,
+                                              patched_create_repository: Mock, patched_now: Mock,
                                               identifier: HabitIdentifier):
         """
         Tests HabitService.complete failure outcome when trying to complete a non-existent habit.
 
         :param mock_connection: Mock database connection.
-        :param mock_repository: Patched mock habit repository.
+        :param mock_repository: Mock habit repository.
+        :param patched_create_repository: Patched habit repository class.
         :param identifier: Habit identifier.
         :return: Nothing.
         """
@@ -237,19 +253,21 @@ class TestHabitService:
         with pytest.raises(HabitNotFoundException):
             service.complete(identifier)
 
-        mock_repository.complete.assert_called_once_with(identifier, mock_now)
+        mock_repository.complete.assert_called_once_with(identifier, MOCK_NOW)
 
     @pytest.mark.parametrize(["identifier"], [
         pytest.param(1, id="identifier_id"),
         pytest.param("Journal", id="identifier_name"),
     ])
-    def test_complete_success(self, mock_connection: Mock, mock_repository: Mock, mock_now: datetime,
+    def test_complete_success(self, mock_connection: Mock, mock_repository: Mock, patched_create_repository: Mock,
+                              patched_now: Mock,
                               identifier: HabitIdentifier):
         """
         Tests HabitService.complete success.
 
         :param mock_connection: Mock database connection.
-        :param mock_repository: Patched mock habit repository.
+        :param mock_repository: Mock habit repository.
+        :param patched_create_repository: Patched habit repository class.
         :param identifier: Habit identifier.
         :return: Nothing.
         """
@@ -257,19 +275,21 @@ class TestHabitService:
 
         service.complete(identifier)
 
-        mock_repository.complete.assert_called_once_with(identifier, mock_now)
+        mock_repository.complete.assert_called_once_with(identifier, MOCK_NOW)
 
     @pytest.mark.parametrize(["identifier"], [
         pytest.param(1, id="identifier_id"),
         pytest.param("Journal", id="identifier_name"),
     ])
     def test_get_one_failure_habit_not_found(self, mock_connection: Mock, mock_repository: Mock,
+                                             patched_create_repository: Mock,
                                              identifier: HabitIdentifier):
         """
         Tests HabitService.get_one success.
 
         :param mock_connection: Mock database connection.
-        :param mock_repository: Patched mock habit repository.
+        :param mock_repository: Mock habit repository.
+        :param patched_create_repository: Patched habit repository class.
         :param identifier: Habit identifier.
         :return: Nothing.
         """
@@ -285,15 +305,17 @@ class TestHabitService:
         pytest.param(1, id="identifier_id"),
         pytest.param("Journal", id="identifier_name"),
     ])
-    def test_get_one_success(self, mock_connection: Mock, mock_repository: Mock, mock_analyse_one: Mock,
-                             mock_now: datetime, identifier: HabitIdentifier):
+    def test_get_one_success(self, mock_connection: Mock, mock_repository: Mock, patched_create_repository: Mock,
+                             patched_analyse_one: Mock,
+                             patched_now: datetime, identifier: HabitIdentifier):
         """
         Tests HabitService.get_one success.
         
         :param mock_connection: Mock database connection.
-        :param mock_repository: Patched mock habit repository.
-        :param mock_analyse_one: Patched mock analyse_one function.
-        :param mock_now: Mock current date and time.
+        :param mock_repository: Mock habit repository.
+        :param patched_create_repository: Patched habit repository class.
+        :param patched_analyse_one: Patched mock analyse_one function.
+        :param patched_now: Patched datetime.now function.
         :param identifier: Habit identifier.
         :return: Nothing.
         """
@@ -305,23 +327,25 @@ class TestHabitService:
         analysis_range = AnalysisRange(date(2026, 5, 12), None)
         analysis = HabitAnalysis(habit, 2, 2, 0.0, True)
         mock_repository.read_one.return_value = habit
-        mock_analyse_one.return_value = analysis
+        patched_analyse_one.return_value = analysis
         service = HabitService(mock_connection)
 
         result = service.get_one(identifier, analysis_range)
 
         mock_repository.read_one.assert_called_once_with(identifier)
-        mock_analyse_one.assert_called_once_with(habit, analysis_range, mock_now)
+        patched_analyse_one.assert_called_once_with(habit, analysis_range, MOCK_NOW)
         assert result == analysis
 
-    def test_get_many(self, mock_connection: Mock, mock_repository: Mock, mock_analyse_many: Mock, mock_now: datetime):
+    def test_get_many(self, mock_connection: Mock, mock_repository: Mock, patched_create_repository: Mock,
+                      patched_analyse_many: Mock, patched_now: Mock):
         """
         Tests HabitService.get_many.
         
         :param mock_connection: Mock database connection.
-        :param mock_repository: Patched mock habit repository.
-        :param mock_analyse_many: Patched mock analyse_many function.
-        :param mock_now: Mock current date and time.
+        :param mock_repository: Mock habit repository.
+        :param patched_create_repository: Patched habit repository class.
+        :param patched_analyse_many: Patched mock analyse_many function.
+        :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
         habits = [
@@ -344,23 +368,25 @@ class TestHabitService:
         filters = [HabitAnalysisFilter.by_search_match("o")]
         order = HabitAnalysisOrder.by_streak(True)
         mock_repository.read_all.return_value = habits
-        mock_analyse_many.return_value = analyses
+        patched_analyse_many.return_value = analyses
         service = HabitService(mock_connection)
 
         result = service.get_many(filters, order, analysis_range)
 
         mock_repository.read_all.assert_called_once()
-        mock_analyse_many.assert_called_once_with(habits, filters, order, analysis_range, mock_now)
+        patched_analyse_many.assert_called_once_with(habits, filters, order, analysis_range, MOCK_NOW)
         assert result == analyses
 
-    def test_analyse(self, mock_connection: Mock, mock_repository: Mock, mock_aggregate: Mock, mock_now: datetime):
+    def test_analyse(self, mock_connection: Mock, mock_repository: Mock, patched_create_repository: Mock,
+                     patched_aggregate: Mock, patched_now: Mock):
         """
         Tests HabitService.analyse.
 
         :param mock_connection: Mock database connection.
-        :param mock_repository: Patched mock habit repository.
-        :param mock_aggregate: Patched mock aggregate function.
-        :param mock_now: Mock current date and time.
+        :param mock_repository: Mock habit repository.
+        :param patched_create_repository: Patched habit repository class.
+        :param patched_aggregate: Patched mock aggregate function.
+        :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
         habits = [
@@ -378,13 +404,13 @@ class TestHabitService:
         analysis = AggregateAnalysis(1, 1, 2, 2.0 / 3.0)
         filters = [HabitAnalysisFilter.by_search_match("o")]
         mock_repository.read_all.return_value = habits
-        mock_aggregate.return_value = analysis
+        patched_aggregate.return_value = analysis
         service = HabitService(mock_connection)
 
         result = service.analyse(filters, analysis_range)
 
         mock_repository.read_all.assert_called_once()
-        mock_aggregate.assert_called_once_with(habits, filters, analysis_range, mock_now)
+        patched_aggregate.assert_called_once_with(habits, filters, analysis_range, MOCK_NOW)
         assert result == analysis
 
 
@@ -435,28 +461,28 @@ class TestHabitServiceIntegration:
     and real analytics module.
     """
 
-    def test_create(self, service: HabitService, mock_now: datetime):
+    def test_create(self, service: HabitService, patched_now: Mock):
         """
         Tests HabitService.create.
 
         :param service: Habit service with a connection to a seeded database.
-        :param mock_now: Mock current date and time.
+        :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
-        expected = HabitAnalysis(Habit(7, "Go to gym", Periodicity.WEEKLY, mock_now, ()), 0, 0, 0.0, True)
+        expected = HabitAnalysis(Habit(7, "Go to gym", Periodicity.WEEKLY, MOCK_NOW, ()), 0, 0, 0.0, True)
 
         service.create("Go to gym", Periodicity.WEEKLY)
         result = service.get_one("Go to gym", AnalysisRange(None, None))
 
         assert result == expected
 
-    def test_edit(self, service: HabitService, analyses: list[HabitAnalysis], mock_now: datetime):
+    def test_edit(self, service: HabitService, analyses: list[HabitAnalysis], patched_now: Mock):
         """
         Tests HabitService.edit.
 
         :param service: Habit service with a connection to a seeded database.
         :param analyses: Test habit analyses based on the mock current date and time.
-        :param mock_now: Mock current date and time.
+        :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
         original = analyses[3]
@@ -470,29 +496,29 @@ class TestHabitServiceIntegration:
 
         assert result == expected
 
-    def test_delete(self, service: HabitService, mock_now: datetime):
+    def test_delete(self, service: HabitService, patched_now: Mock):
         """
         Tests HabitService.delete.
 
         :param service: Habit service with a connection to a seeded database.
-        :param mock_now: Mock current date and time.
+        :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
         service.delete("Do laundry")
         with pytest.raises(HabitNotFoundException):
             service.get_one("Do laundry", AnalysisRange(None, None))
 
-    def test_complete(self, service: HabitService, analyses: list[HabitAnalysis], mock_now: datetime):
+    def test_complete(self, service: HabitService, analyses: list[HabitAnalysis], patched_now: Mock):
         """
         Tests HabitService.complete.
 
         :param service: Habit service with a connection to a seeded database.
         :param analyses: Test habit analyses based on the mock current date and time.
-        :param mock_now: Mock current date and time.
+        :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
         original = analyses[2]
-        expected_completions = tuple([*original.habit.completions, mock_now])
+        expected_completions = tuple([*original.habit.completions, MOCK_NOW])
         # Streak should change from original 0 to 1 and the habit should no longer be pending for the current period.
         expected = HabitAnalysis(
             Habit(original.habit.id, original.habit.name, original.habit.periodicity, original.habit.created_at,
@@ -503,26 +529,26 @@ class TestHabitServiceIntegration:
 
         assert result == expected
 
-    def test_get_one(self, service: HabitService, analyses: list[HabitAnalysis], mock_now: datetime):
+    def test_get_one(self, service: HabitService, analyses: list[HabitAnalysis], patched_now: Mock):
         """
         Tests HabitService.get_one.
 
         :param service: Habit service with a connection to a seeded database.
         :param analyses: Test habit analyses based on the mock current date and time.
-        :param mock_now: Mock current date and time.
+        :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
         result = service.get_one("Do morning exercise", AnalysisRange(None, None))
 
         assert result == analyses[1]
 
-    def test_get_many(self, service: HabitService, analyses: list[HabitAnalysis], mock_now: datetime):
+    def test_get_many(self, service: HabitService, analyses: list[HabitAnalysis], patched_now: Mock):
         """
         Tests HabitService.get_many.
 
         :param service: Habit service with a connection to a seeded database.
         :param analyses: Test habit analyses based on the mock current date and time.
-        :param mock_now: Mock current date and time.
+        :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
         result = service.get_many([], HabitAnalysisOrder(lambda analysis: analysis.habit.id, True),
@@ -530,13 +556,13 @@ class TestHabitServiceIntegration:
 
         assert result == analyses
 
-    def test_analyse(self, service: HabitService, aggregate_analysis: AggregateAnalysis, mock_now: datetime):
+    def test_analyse(self, service: HabitService, aggregate_analysis: AggregateAnalysis, patched_now: Mock):
         """
         Tests HabitService.analyse.
 
         :param service: Habit service with a connection to a seeded database.
         :param aggregate_analysis: Test aggregate analysis.
-        :param mock_now: Mock current date and time.
+        :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
         result = service.analyse([], AnalysisRange(None, None))

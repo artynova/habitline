@@ -6,7 +6,8 @@ import pytest
 from pytest_mock import MockerFixture
 
 from habitline.analytics import HabitAnalysis
-from habitline.repository import Periodicity, Habit
+from habitline.repository import Periodicity, Habit, HabitRepository
+from habitline.service import HabitService
 
 MOCK_ID = 1
 MOCK_NAME = "Lorem ipsum"
@@ -123,3 +124,25 @@ def mock_connection(mocker: MockerFixture):
     mock_connection.cursor.return_value = mock_cursor
     mock_connection.execute.return_value = mock_cursor
     return mock_connection
+
+
+@pytest.fixture()
+def mock_repository(mocker: MockerFixture):
+    """
+    Creates a mock HabitRepository.
+
+    :param mocker: Mocker fixture.
+    :return: Mock class.
+    """
+    return mocker.MagicMock(spec=HabitRepository)
+
+
+@pytest.fixture()
+def mock_service(mocker: MockerFixture):
+    """
+    Creates a mock HabitService.
+
+    :param mocker: Mocker fixture.
+    :return: Mock class.
+    """
+    return mocker.MagicMock(spec=HabitService)

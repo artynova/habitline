@@ -13,12 +13,12 @@ from tests.conftest import make_mock_habit, make_mock_analysis, MOCK_STREAK, MOC
 
 
 @pytest.fixture()
-def mock_analyse_one(mocker: MockerFixture):
+def patched_analyse_one(mocker: MockerFixture):
     """
-    Patches the analyse_one analytics function with a mock and returns the mock.
+    Patches the analyse_one analytics function with a mock.
 
     :param mocker: Mocker fixture.
-    :return: Mock function.
+    :return: Patched function.
     """
     return mocker.patch("habitline.analytics.analyse_one")
 
@@ -513,14 +513,14 @@ class TestAnalytics:
             HabitAnalysisOrder.by_failure_rate(False), [4, 1],
             id="two_filters_order_failure_rate_reversed"),
     ])
-    def test_analyse_many(self, mock_analyse_one: Mock, habits: list[Habit],
+    def test_analyse_many(self, patched_analyse_one: Mock, habits: list[Habit],
                           analyse_one_results: dict[int, HabitAnalysisResult],
                           filters: list[HabitAnalysisFilter], order: HabitAnalysisOrder,
                           expected_ids_ordered: list[int]) -> None:
         """
         Tests the analyse_many analytics function.
 
-        :param mock_analyse_one: Patched mock analyse_one function.
+        :param patched_analyse_one: Patched mock analyse_one function.
         :param habits: List of habits.
         :param analyse_one_results: Mapping of habit IDs to mock analyse_one results for the test.
         :param filters: List of filters for analysed habits.
@@ -529,14 +529,14 @@ class TestAnalytics:
         :return: Nothing.
         """
         mock_range = AnalysisRange(date(2026, 4, 17), date(2026, 4, 22))
-        mock_analyse_one.side_effect = make_mock_analyse_one(analyse_one_results)
+        patched_analyse_one.side_effect = make_mock_analyse_one(analyse_one_results)
 
         actual = analyse_many(habits, filters, order, mock_range, MOCK_NOW)
         actual_ids_ordered = [analysis.habit.id for analysis in actual]
 
         # Check that analyse_one was called correctly. Using any order since order of individual analyses does not
         # matter.
-        mock_analyse_one.assert_has_calls([call(habit, mock_range, MOCK_NOW) for habit in habits], any_order=True)
+        patched_analyse_one.assert_has_calls([call(habit, mock_range, MOCK_NOW) for habit in habits], any_order=True)
         # Check that the ordering of analyses (identity established by numeric IDs) matches the expected ordering.
         assert actual_ids_ordered == expected_ids_ordered
 
@@ -570,13 +570,13 @@ class TestAnalytics:
              HabitAnalysisFilter.by_periodicity(Periodicity.DAILY)], AggregateAnalysis(3, 2, 4, 0.3),
             id="two_filters_one_custom"),
     ])
-    def test_aggregate(self, mock_analyse_one: Mock, habits: list[Habit],
+    def test_aggregate(self, patched_analyse_one: Mock, habits: list[Habit],
                        analyse_one_results: dict[int, HabitAnalysisResult],
                        filters: list[HabitAnalysisFilter], expected: AggregateAnalysis):
         """
         Tests the analyse_many analytics function.
 
-        :param mock_analyse_one: Patched mock analyse_one function.
+        :param patched_analyse_one: Patched mock analyse_one function.
         :param habits: List of habits.
         :param analyse_one_results: Mapping of habit IDs to mock analyse_one results for the test.
         :param filters: List of filters for analysed habits.
@@ -584,12 +584,12 @@ class TestAnalytics:
         :return: Nothing.
         """
         mock_range = AnalysisRange(date(2026, 4, 17), date(2026, 4, 22))
-        mock_analyse_one.side_effect = make_mock_analyse_one(analyse_one_results)
+        patched_analyse_one.side_effect = make_mock_analyse_one(analyse_one_results)
 
         actual = aggregate(habits, filters, mock_range, MOCK_NOW)
 
         # Check that analyse_one was called correctly. Using any order since order of individual analyses does not
         # matter.
-        mock_analyse_one.assert_has_calls([call(habit, mock_range, MOCK_NOW) for habit in habits], any_order=True)
+        patched_analyse_one.assert_has_calls([call(habit, mock_range, MOCK_NOW) for habit in habits], any_order=True)
         # Check result validity.
         assert actual == expected
