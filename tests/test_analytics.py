@@ -94,9 +94,9 @@ class TestAnalytics:
         :param expected: Expected result.
         :return: Nothing.
         """
-        actual = analysis_filter.fn(analysis)
+        result = analysis_filter.fn(analysis)
 
-        assert actual == expected
+        assert result == expected
 
     @pytest.mark.parametrize(["analysis_order", "analysis", "expected_key"], [
         pytest.param(HabitAnalysisOrder.by_name(True), make_mock_analysis(name="Journal"), "Journal", id="by_name"),
@@ -119,9 +119,9 @@ class TestAnalytics:
         :param expected_key: Expected output of the key retrieval function from the given analysis.
         :return: Nothing.
         """
-        actual = analysis_order.key(analysis)
+        result = analysis_order.key(analysis)
 
-        assert actual == expected_key
+        assert result == expected_key
 
     @pytest.mark.parametrize(["habit", "analysis_range", "now", "expected_result"], [
         # Daily habit tests without time range limitations.
@@ -531,14 +531,14 @@ class TestAnalytics:
         mock_range = AnalysisRange(date(2026, 4, 17), date(2026, 4, 22))
         patched_analyse_one.side_effect = make_mock_analyse_one(analyse_one_results)
 
-        actual = analyse_many(habits, filters, order, mock_range, MOCK_NOW)
-        actual_ids_ordered = [analysis.habit.id for analysis in actual]
+        result = analyse_many(habits, filters, order, mock_range, MOCK_NOW)
+        result_ids_ordered = [analysis.habit.id for analysis in result]
 
         # Check that analyse_one was called correctly. Using any order since order of individual analyses does not
         # matter.
         patched_analyse_one.assert_has_calls([call(habit, mock_range, MOCK_NOW) for habit in habits], any_order=True)
         # Check that the ordering of analyses (identity established by numeric IDs) matches the expected ordering.
-        assert actual_ids_ordered == expected_ids_ordered
+        assert result_ids_ordered == expected_ids_ordered
 
     @pytest.mark.parametrize(["habits", "analyse_one_results", "filters", "expected"], [
         pytest.param([], {}, [], AggregateAnalysis(0, 0, 0, 0.0), id="no_habits"),
@@ -586,10 +586,10 @@ class TestAnalytics:
         mock_range = AnalysisRange(date(2026, 4, 17), date(2026, 4, 22))
         patched_analyse_one.side_effect = make_mock_analyse_one(analyse_one_results)
 
-        actual = aggregate(habits, filters, mock_range, MOCK_NOW)
+        result = aggregate(habits, filters, mock_range, MOCK_NOW)
 
         # Check that analyse_one was called correctly. Using any order since order of individual analyses does not
         # matter.
         patched_analyse_one.assert_has_calls([call(habit, mock_range, MOCK_NOW) for habit in habits], any_order=True)
         # Check result validity.
-        assert actual == expected
+        assert result == expected

@@ -384,7 +384,7 @@ class TestHabitRepository:
         check_identifier_filter(select_query, identifier)
         assert set(select_parameters) == {identifier}
 
-    @pytest.mark.parametrize(["identifier", "rows", "expected_habit"], [
+    @pytest.mark.parametrize(["identifier", "rows", "expected"], [
         pytest.param(1, make_select_habit_rows(1, "Journal", Periodicity.DAILY, datetime(2026, 5, 10, 13, 30, 16), []),
                      Habit(1, "Journal", Periodicity.DAILY, datetime(2026, 5, 10, 13, 30, 16), ()),
                      id="identifier_id_no_completions"),
@@ -402,30 +402,30 @@ class TestHabitRepository:
                      id="identifier_name_completions"),
     ])
     def test_read_one_success(self, mock_connection: Mock, identifier: HabitIdentifier,
-                              rows: list[SelectHabitRow], expected_habit: Habit):
+                              rows: list[SelectHabitRow], expected: Habit):
         """
         Tests HabitRepository.read_one success outcome.
 
         :param mock_connection: Mock database connection.
         :param identifier: Habit identifier.
         :param rows: Mock habit SELECT rows.
-        :param expected_habit: Expected parsed habit.
+        :param expected: Expected parsed habit.
         :return: Nothing.
         """
         mock_cursor = mock_connection.cursor()
         mock_cursor.fetchall.return_value = rows
         repository = HabitRepository(mock_connection)
 
-        actual_habit = repository.read_one(identifier)
+        result = repository.read_one(identifier)
 
         mock_connection.execute.assert_called_once()
         select_query, select_parameters = mock_connection.execute.mock_calls[0].args
         check_select_habit_query_text(select_query)
         check_identifier_filter(select_query, identifier)
         assert set(select_parameters) == {identifier}
-        assert actual_habit == expected_habit
+        assert result == expected
 
-    @pytest.mark.parametrize(["rows", "expected_habits"], [
+    @pytest.mark.parametrize(["rows", "expected"], [
         pytest.param([], [], id="no_habits"),
         pytest.param(make_select_habit_rows(1, "Journal", Periodicity.DAILY, datetime(2026, 5, 10, 13, 30, 16), []), [
             Habit(1, "Journal", Periodicity.DAILY, datetime(2026, 5, 10, 13, 30, 16), ()),
@@ -465,22 +465,22 @@ class TestHabitRepository:
             Habit(3, "Go to gym", Periodicity.WEEKLY, datetime(2026, 4, 17, 14, 49, 21), ()),
         ], id="three_habits"),
     ])
-    def test_read_all(self, mock_connection: Mock, rows: list[SelectHabitRow], expected_habits: list[Habit]):
+    def test_read_all(self, mock_connection: Mock, rows: list[SelectHabitRow], expected: list[Habit]):
         """
         Tests HabitRepository.read_all.
 
         :param mock_connection: Mock database connection.
         :param rows: Mock habit SELECT rows.
-        :param expected_habits: Expected parsed habits.
+        :param expected: Expected parsed habits.
         :return: Nothing.
         """
         mock_cursor = mock_connection.cursor()
         mock_cursor.fetchall.return_value = rows
         repository = HabitRepository(mock_connection)
 
-        actual_habits = repository.read_all()
+        result = repository.read_all()
 
         mock_connection.execute.assert_called_once()
         select_query, = mock_connection.execute.mock_calls[0].args
         check_select_habit_query_text(select_query)
-        assert actual_habits == expected_habits
+        assert result == expected
