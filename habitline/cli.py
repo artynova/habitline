@@ -4,32 +4,20 @@ from sqlite3 import Connection
 from typing import Callable, TypeVar
 
 import click
+from click import ClickException, BadParameter
 
 from fixtures.seed import make_test_habits, insert_raw, clear_database
-from habitline.analytics import AnalysisRange, HabitAnalysisFilter, HabitAnalysisOrder, HabitAnalysis
+from habitline.analytics import AnalysisRange, HabitAnalysisFilter, HabitAnalysisOrder, HabitAnalysis, AggregateAnalysis
 from habitline.database import get_connection
 from habitline.repository import HabitIdentifier, Periodicity, HabitRepositoryException
 from habitline.service import HabitService
+from habitline.util import maybe_pluralise
 
 DEFAULT_DB_PATH = "database.db"
 
 pass_connection = click.make_pass_decorator(Connection)
 
-
-def parse_identifier_input(identifier: str, use_id: bool) -> HabitIdentifier:
-    """
-    Processes habit identifier input.
-    Raises an error if use_id is True and the identifier string is not an integer.
-
-    :param identifier: Identifier input string.
-    :param use_id: Numeric ID usage flag.
-    :return: Identifier string itself if use_id is False, parsed integer from the string if use_id is True.
-    """
-    if not use_id:
-        return identifier
-    if not identifier.isdigit():
-        raise click.BadParameter(f'Identifier "{identifier}" is not an integer.')
-    return int(identifier)
+CLI_OUTPUT_SEPARATOR = "-" * 20
 
 
 @click.group(help="A simple CLI application for managing, tracking, and analysing habits.")
@@ -42,7 +30,6 @@ def cli(context: click.Context, path: str):
 
     :return: Nothing.
     """
-    context.ensure_object(dict)
     connection = get_connection(path)
     context.obj = connection
     context.call_on_close(connection.close)
@@ -64,7 +51,7 @@ def execute_habit_service_call(func: Callable[[], T]) -> T:
     try:
         return func()
     except HabitRepositoryException as e:
-        raise click.ClickException(str(e))
+        raise ClickException(str(e))
 
 
 @cli.command(help="Create a new habit.")
@@ -80,25 +67,23 @@ def create(connection: Connection, name: str, periodicity: Periodicity):
     service = HabitService(connection)
     execute_habit_service_call(lambda: service.create(name, periodicity))
 
+    click.echo("Habit created successfully.")
 
-@cli.command(help="Log habit completion.")
-@click.argument("identifier")
-@click.option("--use-id", is_flag=True,
-              help="Interpret the identifier as habit's numeric ID. In this case the identifier must be an integer.")
-@pass_connection
-def complete(connection: Connection, identifier: str, use_id: bool):
+
+def parse_identifier_input(identifier: str, use_id: bool) -> HabitIdentifier:
     """
-    Logs a habit completion.
+    Processes habit identifier input.
+    Raises an error if use_id is True and the identifier string is not an integer.
 
-    :param connection: Database connection.
-    :param identifier: Habit identifier.
-    :param use_id: Whether to interpret the identifier as a numeric ID.
-    :return: Nothing.
+    :param identifier: Identifier input string.
+    :param use_id: Numeric ID usage flag.
+    :return: Identifier string itself if use_id is False, parsed integer from the string if use_id is True.
     """
-    habit_id = parse_identifier_input(identifier, use_id)
-
-    service = HabitService(connection)
-    execute_habit_service_call(lambda: service.complete(habit_id))
+    if not use_id:
+        return identifier
+    if not identifier.isdigit():
+        raise BadParameter(f'Identifier "{identifier}" is not an integer.')
+    return int(identifier)
 
 
 @cli.command(help="Edit a habit.")
@@ -117,10 +102,12 @@ def edit(connection: Connection, identifier: str, name: str, use_id: bool):
     :param use_id: Whether to interpret the identifier as a numeric ID.
     :return: Nothing.
     """
-    habit_id = parse_identifier_input(identifier, use_id)
+    parsed_identifier = parse_identifier_input(identifier, use_id)
 
     service = HabitService(connection)
-    execute_habit_service_call(lambda: service.edit(habit_id, name))
+    execute_habit_service_call(lambda: service.edit(parsed_identifier, name))
+
+    click.echo("Habit name edited successfully.")
 
 
 @cli.command(help="Delete a habit.")
@@ -137,10 +124,34 @@ def delete(connection: Connection, identifier: str, use_id: bool):
     :param use_id: Whether to interpret the identifier as a numeric ID.
     :return: Nothing.
     """
-    habit_id = parse_identifier_input(identifier, use_id)
+    parsed_identifier = parse_identifier_input(identifier, use_id)
 
     service = HabitService(connection)
-    execute_habit_service_call(lambda: service.delete(habit_id))
+    execute_habit_service_call(lambda: service.delete(parsed_identifier))
+
+    click.echo("Habit deleted successfully.")
+
+
+@cli.command(help="Log habit completion.")
+@click.argument("identifier")
+@click.option("--use-id", is_flag=True,
+              help="Interpret the identifier as habit's numeric ID. In this case the identifier must be an integer.")
+@pass_connection
+def complete(connection: Connection, identifier: str, use_id: bool):
+    """
+    Logs a habit completion.
+
+    :param connection: Database connection.
+    :param identifier: Habit identifier.
+    :param use_id: Whether to interpret the identifier as a numeric ID.
+    :return: Nothing.
+    """
+    parsed_identifier = parse_identifier_input(identifier, use_id)
+
+    service = HabitService(connection)
+    execute_habit_service_call(lambda: service.complete(parsed_identifier))
+
+    click.echo("Habit completion logged successfully.")
 
 
 def format_percentage(percentage: float) -> str:
@@ -151,6 +162,25 @@ def format_percentage(percentage: float) -> str:
     :return: Formatted percentage, e.g., 56.3%.
     """
     return f"{percentage:.1%}"
+
+
+def streak_periods_text(periods: int, periodicity: Periodicity | None = None) -> str:
+    """
+    Determines the text representing the given number of periods in the given periodicity.
+    For example, for 1 period and daily periodicity, it is "1 day". If periodicity is None, generic period text is used.
+
+    :param periods: Number of periods.
+    :param periodicity: Habit periodicity, or None.
+    :return: Period count representation.
+    """
+    base = str(periods) + " "
+    match periodicity:
+        case Periodicity.DAILY:
+            return base + maybe_pluralise("day", periods)
+        case Periodicity.WEEKLY:
+            return base + maybe_pluralise("week", periods)
+        case _:
+            return base + maybe_pluralise("period", periods)
 
 
 def represent_habit(analysis: HabitAnalysis, analysis_limited: bool = False, show_completions: bool = False) -> str:
@@ -169,13 +199,18 @@ def represent_habit(analysis: HabitAnalysis, analysis_limited: bool = False, sho
                      f"Name:{analysis_limited_extra_tabs}\t\t{habit.name}\n" + \
                      f"Periodicity:{analysis_limited_extra_tabs}\t{habit.periodicity.name.capitalize()}\n" + \
                      f"Created at:{analysis_limited_extra_tabs}\t{habit.created_at}\n" + \
-                     f"Current streak{analysis_limited_extra_text}:\t{analysis.streak}\n" + \
-                     f"Longest streak{analysis_limited_extra_text}:\t{analysis.longest_streak}\n" + \
+                     f"Current streak{analysis_limited_extra_text}:\t{streak_periods_text(analysis.streak, habit.periodicity)}\n" + \
+                     f"Longest streak{analysis_limited_extra_text}:\t{streak_periods_text(analysis.longest_streak, habit.periodicity)}\n" + \
                      f"Failure rate{analysis_limited_extra_text}:\t{format_percentage(analysis.failure_rate)}\n" + \
-                     f"Pending:{analysis_limited_extra_tabs}\t{analysis.pending}"
-    if show_completions:
-        representation += "\nCompletions:\n" + "\n".join([f"- {completion}" for completion in habit.completions])
+                     f"Pending:{analysis_limited_extra_tabs}\t{'Yes' if analysis.pending else 'No'}"
+    if not show_completions:
+        return representation
 
+    if habit.completions:
+        completions_text = "All completions:" if analysis_limited else "Completions:"
+        representation += f"\n{completions_text}\n" + "\n".join([f"- {completion}" for completion in habit.completions])
+    else:
+        representation += "\nNo completions"
     return representation
 
 
@@ -255,8 +290,6 @@ def make_habit_order(option: OrderOption, asc: bool) -> HabitAnalysisOrder:
     match option:
         case OrderOption.NAME:
             return HabitAnalysisOrder.by_name(asc)
-        case OrderOption.CREATED_AT:
-            return HabitAnalysisOrder.by_created_at(asc)
         case OrderOption.STREAK:
             return HabitAnalysisOrder.by_streak(asc)
         case OrderOption.LONGEST_STREAK:
@@ -264,7 +297,7 @@ def make_habit_order(option: OrderOption, asc: bool) -> HabitAnalysisOrder:
         case OrderOption.FAILURE_RATE:
             return HabitAnalysisOrder.by_failure_rate(asc)
         case _:
-            raise NotImplementedError
+            return HabitAnalysisOrder.by_created_at(asc)
 
 
 @cli.command("list", help="View a list of multiple habits.")
@@ -273,7 +306,7 @@ def make_habit_order(option: OrderOption, asc: bool) -> HabitAnalysisOrder:
 @click.option("--pending/--completed", "pending", is_flag=True, default=None,
               help="Filter habits to those that are yet to be completed in the current period or have already been completed, respectively.")
 @click.option("--search", help="Filter habits to those whose names include the given string, case-insensitive.")
-@click.option("--sort", type=click.Choice(OrderOption, case_sensitive=False), default=OrderOption.NAME,
+@click.option("--sort", type=click.Choice(OrderOption, case_sensitive=False), default=OrderOption.CREATED_AT,
               help='Sort habits using the given order. "Created at" order is used by default.')
 @click.option("--asc/--desc", "asc", is_flag=True, default=True,
               help="Sort in ascending or descending order. Ascending order is used by default.")
@@ -306,9 +339,18 @@ def list_habits(connection: Connection, periodicity: Periodicity | None, pending
     service = HabitService(connection)
     habits = execute_habit_service_call(lambda: service.get_many(filters, order, analysis_range))
 
-    click.echo(f"Found {len(habits)} habits" + (":" if len(habits) > 1 else ""))
+    click.echo(f"Found {len(habits)} {maybe_pluralise('habit', len(habits))}" + (":" if len(habits) > 0 else ""))
     for habit in habits:
-        click.echo("-" * 20 + "\n" + represent_habit(habit, range_specified))
+        click.echo(CLI_OUTPUT_SEPARATOR + "\n" + represent_habit(habit, range_specified))
+
+
+def represent_aggregate_analysis(analysis: AggregateAnalysis, analysis_limited: bool):
+    analysis_limited_extra_tabs = "\t\t\t" if analysis_limited else ""
+    analysis_limited_extra_text = " in target time range" if analysis_limited else ""
+    return f"Analysed habits:{analysis_limited_extra_tabs}\t\t{analysis.habit_count}\n" + \
+        f"Current longest streak{analysis_limited_extra_text}:\t\t{streak_periods_text(analysis.current_longest_streak)}\n" + \
+        f"Longest logged streak{analysis_limited_extra_text}:\t\t{streak_periods_text(analysis.longest_streak)}\n" + \
+        f"Average failure rate{analysis_limited_extra_text}:\t\t{format_percentage(analysis.avg_failure_rate)}"
 
 
 @cli.command(help="Generate aggregate analysis of multiple habits.")
@@ -338,18 +380,16 @@ def analyse(connection: Connection, periodicity: Periodicity | None, pending: bo
     filters = make_habit_filters(periodicity, pending, search)
     analysis_range = AnalysisRange(analyse_from.date() if analyse_from else None,
                                    analyse_until.date() if analyse_until else None)
+    range_specified = bool(analyse_from or analyse_until)
 
     service = HabitService(connection)
     analysis = execute_habit_service_call(lambda: service.analyse(filters, analysis_range))
 
-    click.echo(f"Analysed habits:\t\t{analysis.habit_count}")
-    click.echo(f"Current longest streak:\t\t{analysis.current_longest_streak} periods")
-    click.echo(f"Longest recorded streak:\t{analysis.longest_streak} periods")
-    click.echo(f"Average failure rate:\t\t{format_percentage(analysis.avg_failure_rate)}")
+    click.echo(represent_aggregate_analysis(analysis, range_specified))
 
 
 @cli.group(help="Special debugging commands, not for regular usage.")
-def debug():
+def debug(): # pragma: no cover
     """
     Does nothing, serves as the Click command group for debug commands.
 
@@ -361,7 +401,7 @@ def debug():
 @debug.command(
     help="Fill the database with predefined habits that have example tracking data, clearing any previous application data.")
 @pass_connection
-def seed(connection: Connection):
+def seed(connection: Connection): # pragma: no cover
     """
     Seeds the database with predefined example habits for manual testing purposes.
     Clears any other application data from the database.
