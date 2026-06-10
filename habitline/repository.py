@@ -54,6 +54,60 @@ class HabitNotFoundException(HabitRepositoryException):
             super().__init__(f'Could not find habit with name "{identifier}".')
 
 
+def periodicity_to_stored(periodicity: Periodicity) -> int:
+    """
+    Converts periodicity to an integer that can be stored in the database.
+
+    :param periodicity: Periodicity.
+    :return: Integer representing the periodicity.
+    """
+    return periodicity.value
+
+
+def stored_to_periodicity(periodicity: int) -> Periodicity:
+    """
+    Converts stored periodicity (an integer) to a Periodicity enum member.
+
+    :param periodicity: Stored periodicity.
+    :return: Periodicity enum member.
+    """
+    return Periodicity(periodicity)
+
+
+def datetime_to_stored(date_and_time: datetime) -> int:
+    """
+    Converts date and time to an integer that can be stored in the database (the POSIX timestamp).
+
+    :param date_and_time: Date and time.
+    :return: Integer representing the date and time.
+    """
+    return int(date_and_time.timestamp())
+
+
+def stored_to_datetime(date_and_time: int) -> datetime:
+    """
+    Converts stored date and time (an integer) to a datetime object.
+
+    :param date_and_time: Date and time as an integer (the POSIX timestamp).
+    :return: datetime object.
+    """
+    return datetime.fromtimestamp(date_and_time)
+
+
+def get_identifier_column(identifier: HabitIdentifier) -> str:
+    """
+    Determines the database column storing the given identifier type.
+
+    :param identifier: Habit identifier - either numeric ID or name.
+    :return: "name" for string identifiers, "id" for integer identifiers.
+    """
+    # ID case
+    if type(identifier) is int:
+        return "id"
+    # Name case
+    return "name"
+
+
 class HabitNameTakenException(HabitRepositoryException):
     """
     Exception raised changing a habit's name to the given name would result in a name collision.
@@ -78,60 +132,6 @@ class HabitRepository:
         """
         self.__connection = connection
 
-    @staticmethod
-    def periodicity_to_stored(periodicity: Periodicity) -> int:
-        """
-        Converts periodicity to an integer that can be stored in the database.
-
-        :param periodicity: Periodicity.
-        :return: Integer representing the periodicity.
-        """
-        return periodicity.value
-
-    @staticmethod
-    def stored_to_periodicity(periodicity: int) -> Periodicity:
-        """
-        Converts stored periodicity (an integer) to a Periodicity enum member.
-
-        :param periodicity: Stored periodicity.
-        :return: Periodicity enum member.
-        """
-        return Periodicity(periodicity)
-
-    @staticmethod
-    def datetime_to_stored(date_and_time: datetime) -> int:
-        """
-        Converts date and time to an integer that can be stored in the database (the POSIX timestamp).
-
-        :param date_and_time: Date and time.
-        :return: Integer representing the date and time.
-        """
-        return int(date_and_time.timestamp())
-
-    @staticmethod
-    def stored_to_datetime(date_and_time: int) -> datetime:
-        """
-        Converts stored date and time (an integer) to a datetime object.
-
-        :param date_and_time: Date and time as an integer (the POSIX timestamp).
-        :return: datetime object.
-        """
-        return datetime.fromtimestamp(date_and_time)
-
-    @staticmethod
-    def get_identifier_column(identifier: HabitIdentifier) -> str:
-        """
-        Determines the database column storing the given identifier type.
-
-        :param identifier: Habit identifier - either numeric ID or name.
-        :return: "name" for string identifiers, "id" for integer identifiers.
-        """
-        # ID case
-        if type(identifier) is int:
-            return "id"
-        # Name case
-        return "name"
-
     def create(self, name: str, periodicity: Periodicity, created_at: datetime) -> None:
         """
         Creates a new habit.
@@ -146,8 +146,8 @@ class HabitRepository:
         if self.__exists(name):
             raise HabitNameTakenException(name)
         self.__connection.execute("INSERT INTO habit (name, periodicity, created_at) VALUES (?, ?, ?)",
-                                  (name, HabitRepository.periodicity_to_stored(periodicity),
-                                   HabitRepository.datetime_to_stored(created_at)))
+                                  (name, periodicity_to_stored(periodicity),
+                                   datetime_to_stored(created_at)))
         self.__connection.commit()
 
     def update(self, identifier: HabitIdentifier, name: str) -> None:
@@ -174,7 +174,7 @@ class HabitRepository:
             # Otherwise, it is a different habit by which the name is already taken.
             raise HabitNameTakenException(name)
         self.__connection.execute(
-            f"UPDATE habit SET name = ? WHERE {HabitRepository.get_identifier_column(identifier)} = ?",
+            f"UPDATE habit SET name = ? WHERE {get_identifier_column(identifier)} = ?",
             (name, identifier))
         self.__connection.commit()
 
@@ -189,7 +189,7 @@ class HabitRepository:
         """
         if not self.__exists(identifier):
             raise HabitNotFoundException(identifier)
-        self.__connection.execute(f"DELETE FROM habit WHERE {HabitRepository.get_identifier_column(identifier)} = ?",
+        self.__connection.execute(f"DELETE FROM habit WHERE {get_identifier_column(identifier)} = ?",
                                   (identifier,))
         self.__connection.commit()
 
@@ -207,7 +207,7 @@ class HabitRepository:
         if habit_id is None:
             raise HabitNotFoundException(identifier)
         self.__connection.execute("INSERT INTO completion (habit_id, completed_at) VALUES (?, ?)",
-                                  (habit_id, HabitRepository.datetime_to_stored(completed_at)))
+                                  (habit_id, datetime_to_stored(completed_at)))
 
     def __get_habit_id(self, identifier: HabitIdentifier) -> int | None:
         """
@@ -218,7 +218,7 @@ class HabitRepository:
         :return: Numeric ID of the habit, or None if the habit cannot be found.
         """
         result = self.__connection.execute(
-            f"SELECT id FROM habit WHERE {HabitRepository.get_identifier_column(identifier)} = ?",
+            f"SELECT id FROM habit WHERE {get_identifier_column(identifier)} = ?",
             (identifier,)).fetchone()
         if result is None:
             return None
@@ -248,7 +248,7 @@ class HabitRepository:
         results = self.__connection.execute(f"""
             SELECT habit.id, habit.name, habit.periodicity, habit.created_at, completion.completed_at
             FROM habit LEFT JOIN completion ON habit.id = completion.habit_id
-            WHERE {HabitRepository.get_identifier_column(identifier)} = ?
+            WHERE {get_identifier_column(identifier)} = ?
             ORDER BY completion.completed_at""", (identifier,)).fetchall()
         if not results:
             raise HabitNotFoundException(identifier)
@@ -256,8 +256,8 @@ class HabitRepository:
         # the row corresponds to a join with an actual completion. If it is NULL, then it is produced by the left join
         # for a habit without completions.
         habit_completions = [datetime.fromtimestamp(row[4]) for row in results if row[4]]
-        return Habit(results[0][0], results[0][1], HabitRepository.stored_to_periodicity(results[0][2]),
-                     HabitRepository.stored_to_datetime(results[0][3]),
+        return Habit(results[0][0], results[0][1], stored_to_periodicity(results[0][2]),
+                     stored_to_datetime(results[0][3]),
                      tuple(habit_completions))
 
     def read_all(self) -> list[Habit]:
@@ -277,7 +277,7 @@ class HabitRepository:
         for row in results:
             if habit_records.get(row[0]) is None:
                 habit_records[row[0]] = (
-                row[1], HabitRepository.stored_to_periodicity(row[2]), HabitRepository.stored_to_datetime(row[3]), [])
+                    row[1], stored_to_periodicity(row[2]), stored_to_datetime(row[3]), [])
             # The "if row[4]" condition is only True when the completion.completed_at value is not NULL, in which case
             # the row corresponds to a join with an actual completion. If it is NULL, then it is produced by the
             # left join for a habit without completions.

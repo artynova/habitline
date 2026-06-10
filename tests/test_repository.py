@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from habitline.repository import HabitRepository, Periodicity, HabitNameTakenException, HabitIdentifier, \
-    HabitNotFoundException, Habit
+    HabitNotFoundException, Habit, datetime_to_stored, periodicity_to_stored
 from tests.conftest import MOCK_NOW
 
 
@@ -71,8 +71,8 @@ def make_select_habit_row(id: int, name: str, periodicity: Periodicity, created_
     :param completed_at: Habit completion date and time, or None.
     :return: Habit SELECT result row.
     """
-    return id, name, HabitRepository.periodicity_to_stored(periodicity), HabitRepository.datetime_to_stored(
-        created_at), HabitRepository.datetime_to_stored(completed_at) if completed_at is not None else None
+    return id, name, periodicity_to_stored(periodicity), datetime_to_stored(
+        created_at), datetime_to_stored(completed_at) if completed_at is not None else None
 
 
 def check_select_habit_query_text(query: str):
@@ -155,8 +155,8 @@ class TestHabitRepository:
         insert_query, insert_parameters = mock_connection.execute.mock_calls[1].args
         assert "INSERT INTO habit" in insert_query
         assert "VALUES (?, ?, ?)" in insert_query
-        assert set(insert_parameters) == {name, HabitRepository.periodicity_to_stored(periodicity),
-                                          HabitRepository.datetime_to_stored(created_at)}
+        assert set(insert_parameters) == {name, periodicity_to_stored(periodicity),
+                                          datetime_to_stored(created_at)}
 
     @pytest.mark.parametrize(["identifier"], [
         pytest.param(1, id="identifier_id"),
@@ -358,7 +358,7 @@ class TestHabitRepository:
         insert_query, insert_parameters = mock_connection.execute.mock_calls[1].args
         assert "INSERT INTO completion" in insert_query
         assert "VALUES (?, ?)" in insert_query
-        assert set(insert_parameters) == {own_id, HabitRepository.datetime_to_stored(completed_at)}
+        assert set(insert_parameters) == {own_id, datetime_to_stored(completed_at)}
 
     @pytest.mark.parametrize(["identifier"], [
         pytest.param(1, id="identifier_id"),
