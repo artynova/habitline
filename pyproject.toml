@@ -17,12 +17,18 @@ dependencies = [
     "click>=8.1",
     "pytest>=9.0.0",
     "pytest-mock>=3.15.0",
+    "pytest-cov>=7.0.0",
 ]
 
 [tool.pytest]
-addopts = ["-ra", "-q"]
+addopts = ["-ra", "-q", "--cov=habitline"]
 testpaths = [
     "tests",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
 ]
 
 [project.scripts]
