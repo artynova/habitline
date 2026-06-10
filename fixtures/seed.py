@@ -107,6 +107,7 @@ def make_test_habit_analyses(now: datetime) -> list[HabitAnalysis]:
             at_time(offset_date(now, -23), 11, 12, 41),
             at_time(offset_date(now, -20), 15, 30, 5),
             at_time(offset_date(now, -18), 12, 31, 8),
+            at_time(offset_date(now, -15), 14, 5, 5),
             at_time(offset_date(now, -14), 9, 35, 10),
             at_time(offset_date(now, -14), 15, 21, 26),
             at_time(offset_date(now, -12), 14, 58, 27),
@@ -118,9 +119,8 @@ def make_test_habit_analyses(now: datetime) -> list[HabitAnalysis]:
             at_time(offset_date(now, -5), 14, 32, 10),
             at_time(offset_date(now, -4), 10, 40, 12),
             at_time(offset_date(now, -4), 15, 1, 59),
-            at_time(offset_date(now, -2), 14, 5, 5),
             at_time(offset_date(now, -1), 12, 53, 56),
-        )), 2, 4, 11.0 / 28.0, True),
+        )), 1, 4, 11.0 / 28.0, True),
 
         HabitAnalysis(
             Habit(6, "Review financials", Periodicity.WEEKLY, at_time(offset_date(week_start, -28), 13, 22, 39), ()),
