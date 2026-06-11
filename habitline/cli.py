@@ -21,7 +21,7 @@ CLI_OUTPUT_SEPARATOR = "-" * 20
 
 
 @click.group(help="A simple CLI application for managing, tracking, and analysing habits.")
-@click.option("--path", envvar="HABITLINE_PATH", default=DEFAULT_DB_PATH, help="Specify custom database file path.",
+@click.option("--path", envvar="HABITLINE_PATH", default=DEFAULT_DB_PATH, help="Specify custom database file path. Can also be provided through the HABITLINE_PATH environment variable.",
               type=click.Path())
 @click.pass_context
 def cli(context: click.Context, path: str):
