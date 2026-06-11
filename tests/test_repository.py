@@ -39,6 +39,21 @@ def check_identifier_lookup(query: str, parameters: tuple[any, ...], identifier:
     assert parameters == (identifier,)
 
 
+def check_connection_committed(mock_connection: Mock, committed: bool = True):
+    """
+    Asserts that the connection committed or did not commit changes.
+    If committed is True, will assert that a commit did happen. Otherwise, will assert that no commit occurred.
+
+    :param mock_connection: Mock database connection.
+    :param committed: Whether to assert a commit or a lack thereof.
+    :return: Nothing.
+    """
+    if committed:
+        mock_connection.commit.assert_called_once()
+    else:
+        mock_connection.commit.assert_not_called()
+
+
 def check_identifier_lookup_call(args: Sequence[str, tuple], identifier: HabitIdentifier):
     """
     Asserts that the call arguments for query execution (SQL query string and query parameters) are correct for looking
@@ -130,6 +145,7 @@ class TestHabitRepository:
 
         mock_connection.execute.assert_called_once()
         check_identifier_lookup_call(mock_connection.execute.mock_calls[0].args, name)
+        check_connection_committed(mock_connection, False)
 
     @pytest.mark.parametrize(["periodicity"], [
         pytest.param(Periodicity.DAILY, id="daily"),
@@ -157,6 +173,7 @@ class TestHabitRepository:
         assert "VALUES (?, ?, ?)" in insert_query
         assert set(insert_parameters) == {name, periodicity_to_stored(periodicity),
                                           datetime_to_stored(created_at)}
+        check_connection_committed(mock_connection)
 
     @pytest.mark.parametrize(["identifier"], [
         pytest.param(1, id="identifier_id"),
@@ -180,6 +197,7 @@ class TestHabitRepository:
 
         mock_connection.execute.assert_called_once()
         check_identifier_lookup_call(mock_connection.execute.mock_calls[0].args, identifier)
+        check_connection_committed(mock_connection, False)
 
     @pytest.mark.parametrize(["identifier", "own_id"], [
         pytest.param(1, 1, id="identifier_id"),
@@ -206,6 +224,7 @@ class TestHabitRepository:
         assert len(mock_connection.execute.mock_calls) == 2
         check_identifier_lookup_call(mock_connection.execute.mock_calls[0].args, identifier)
         check_identifier_lookup_call(mock_connection.execute.mock_calls[1].args, name)
+        check_connection_committed(mock_connection, False)
 
     @pytest.mark.parametrize(["identifier", "own_id"], [
         pytest.param(1, 1, id="identifier_id"),
@@ -235,6 +254,7 @@ class TestHabitRepository:
         assert "SET name = ?" in update_query
         check_identifier_filter(update_query, identifier)
         assert set(update_parameters) == {name, identifier}
+        check_connection_committed(mock_connection)
 
     @pytest.mark.parametrize(["identifier", "own_id"], [
         pytest.param(1, 1, id="identifier_id"),
@@ -260,7 +280,8 @@ class TestHabitRepository:
         check_identifier_lookup_call(mock_connection.execute.mock_calls[0].args, identifier)
         check_identifier_lookup_call(mock_connection.execute.mock_calls[1].args, name)
         # There should not be any updates because changing the name to the same value is a no-op and does not need to
-        # access the database
+        # access the database.
+        check_connection_committed(mock_connection, False)
 
     @pytest.mark.parametrize(["identifier"], [
         pytest.param(1, id="identifier_id"),
@@ -283,6 +304,7 @@ class TestHabitRepository:
 
         mock_connection.execute.assert_called_once()
         check_identifier_lookup_call(mock_connection.execute.mock_calls[0].args, identifier)
+        check_connection_committed(mock_connection, False)
 
     @pytest.mark.parametrize(["identifier", "own_id"], [
         pytest.param(1, 1, id="identifier_id"),
@@ -309,6 +331,7 @@ class TestHabitRepository:
         assert "DELETE FROM habit" in delete_query
         check_identifier_filter(delete_query, identifier)
         assert delete_parameters == (identifier,)
+        check_connection_committed(mock_connection)
 
     @pytest.mark.parametrize(["identifier"], [
         pytest.param(1, id="identifier_id"),
@@ -332,6 +355,7 @@ class TestHabitRepository:
 
         mock_connection.execute.assert_called_once()
         check_identifier_lookup_call(mock_connection.execute.mock_calls[0].args, identifier)
+        check_connection_committed(mock_connection, False)
 
     @pytest.mark.parametrize(["identifier", "own_id"], [
         pytest.param(1, 1, id="identifier_id"),
@@ -359,6 +383,7 @@ class TestHabitRepository:
         assert "INSERT INTO completion" in insert_query
         assert "VALUES (?, ?)" in insert_query
         assert set(insert_parameters) == {own_id, datetime_to_stored(completed_at)}
+        check_connection_committed(mock_connection)
 
     @pytest.mark.parametrize(["identifier"], [
         pytest.param(1, id="identifier_id"),

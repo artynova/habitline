@@ -1,4 +1,5 @@
 from datetime import datetime, date
+from sqlite3 import Connection
 from unittest.mock import Mock
 
 import pytest
@@ -415,20 +416,20 @@ class TestHabitService:
 
 
 @pytest.fixture()
-def service():
+def connection():
     """
-    Creates a HabitService with a connection to a seeded in-memory SQLite database. The database is seeded with the
-    6 predefined habits that are provided by the debug seeding module, created with reference to the mock present date
-    and time.
+    Creates a connection to a seeded in-memory SQLite database. The database is seeded with the 6 predefined habits
+    that are provided by the debug seeding module, created with reference to the mock present date and time.
 
-    :return: Service.
+    The connection is closed as part of post-test cleanup.
+
+    :return: Connection.
     """
     connection = get_connection(":memory:")
     habits = make_test_habits(MOCK_NOW)
     insert_raw(connection, habits)
 
-    # Provide the service instance to the test using the fixture.
-    yield HabitService(connection)
+    yield connection
 
     # Clean up.
     connection.close()
@@ -461,26 +462,29 @@ class TestHabitServiceIntegration:
     and real analytics module.
     """
 
-    def test_create(self, service: HabitService, patched_now: Mock):
+    def test_create(self, connection: Connection, patched_now: Mock):
         """
         Tests HabitService.create.
 
-        :param service: Habit service with a connection to a seeded database.
+        :param connection: Connection to a seeded database.
         :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
         expected = HabitAnalysis(Habit(7, "Go to gym", Periodicity.WEEKLY, MOCK_NOW, ()), 0, 0, 0.0, True)
+        service = HabitService(connection)
 
         service.create("Go to gym", Periodicity.WEEKLY)
+        # Roll back any uncommitted data, which is what happens when the CLI application closes.
+        connection.rollback()
         result = service.get_one("Go to gym", AnalysisRange(None, None))
 
         assert result == expected
 
-    def test_edit(self, service: HabitService, analyses: list[HabitAnalysis], patched_now: Mock):
+    def test_edit(self, connection: Connection, analyses: list[HabitAnalysis], patched_now: Mock):
         """
         Tests HabitService.edit.
 
-        :param service: Habit service with a connection to a seeded database.
+        :param connection: Connection to a seeded database.
         :param analyses: Test habit analyses based on the mock current date and time.
         :param patched_now: Patched datetime.now function.
         :return: Nothing.
@@ -490,29 +494,34 @@ class TestHabitServiceIntegration:
             Habit(original.habit.id, "Go to gym", original.habit.periodicity, original.habit.created_at,
                   original.habit.completions), original.streak, original.longest_streak, original.failure_rate,
             original.pending)
+        service = HabitService(connection)
 
         service.edit("Do laundry", "Go to gym")
+        connection.rollback()
         result = service.get_one("Go to gym", AnalysisRange(None, None))
 
         assert result == expected
 
-    def test_delete(self, service: HabitService, patched_now: Mock):
+    def test_delete(self, connection: Connection, patched_now: Mock):
         """
         Tests HabitService.delete.
 
-        :param service: Habit service with a connection to a seeded database.
+        :param connection: Connection to a seeded database.
         :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
+        service = HabitService(connection)
+
         service.delete("Do laundry")
+        connection.rollback()
         with pytest.raises(HabitNotFoundException):
             service.get_one("Do laundry", AnalysisRange(None, None))
 
-    def test_complete(self, service: HabitService, analyses: list[HabitAnalysis], patched_now: Mock):
+    def test_complete(self, connection: Connection, analyses: list[HabitAnalysis], patched_now: Mock):
         """
         Tests HabitService.complete.
 
-        :param service: Habit service with a connection to a seeded database.
+        :param connection: Connection to a seeded database.
         :param analyses: Test habit analyses based on the mock current date and time.
         :param patched_now: Patched datetime.now function.
         :return: Nothing.
@@ -523,48 +532,56 @@ class TestHabitServiceIntegration:
         expected = HabitAnalysis(
             Habit(original.habit.id, original.habit.name, original.habit.periodicity, original.habit.created_at,
                   expected_completions), 1, original.longest_streak, original.failure_rate, False)
+        service = HabitService(connection)
 
         service.complete("Call grandparents")
+        connection.rollback()
         result = service.get_one("Call grandparents", AnalysisRange(None, None))
 
         assert result == expected
 
-    def test_get_one(self, service: HabitService, analyses: list[HabitAnalysis], patched_now: Mock):
+    def test_get_one(self, connection: Connection, analyses: list[HabitAnalysis], patched_now: Mock):
         """
         Tests HabitService.get_one.
 
-        :param service: Habit service with a connection to a seeded database.
+        :param connection: Connection to a seeded database.
         :param analyses: Test habit analyses based on the mock current date and time.
         :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
+        service = HabitService(connection)
+
         result = service.get_one("Do morning exercise", AnalysisRange(None, None))
 
         assert result == analyses[1]
 
-    def test_get_many(self, service: HabitService, analyses: list[HabitAnalysis], patched_now: Mock):
+    def test_get_many(self, connection: Connection, analyses: list[HabitAnalysis], patched_now: Mock):
         """
         Tests HabitService.get_many.
 
-        :param service: Habit service with a connection to a seeded database.
+        :param connection: Connection to a seeded database.
         :param analyses: Test habit analyses based on the mock current date and time.
         :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
+        service = HabitService(connection)
+
         result = service.get_many([], HabitAnalysisOrder(lambda analysis: analysis.habit.id, True),
                                   AnalysisRange(None, None))
 
         assert result == analyses
 
-    def test_analyse(self, service: HabitService, aggregate_analysis: AggregateAnalysis, patched_now: Mock):
+    def test_analyse(self, connection: Connection, aggregate_analysis: AggregateAnalysis, patched_now: Mock):
         """
         Tests HabitService.analyse.
 
-        :param service: Habit service with a connection to a seeded database.
+        :param connection: Connection to a seeded database.
         :param aggregate_analysis: Test aggregate analysis.
         :param patched_now: Patched datetime.now function.
         :return: Nothing.
         """
+        service = HabitService(connection)
+
         result = service.analyse([], AnalysisRange(None, None))
 
         assert result.habit_count == aggregate_analysis.habit_count
