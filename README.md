@@ -30,7 +30,7 @@ The project is developed for a course at the [International University of Applie
 - Start a new terminal session. The CLI tool should now be installed.
 - Run `habitline` or `habitline --help` to print help about commands.
 
-# As a Developer
+## As a Developer
 
 - Have Python installed. Minimum version - 3.11.
 - Clone the repository and navigate into its folder.
@@ -42,4 +42,17 @@ The project is developed for a course at the [International University of Applie
 
 # Testing the Application
 
-Run `pytest` after installing the development version. This will all tests and a coverage report.
+## Automated Testing
+
+Run `pytest` after installing the development version. This will run all test cases and a coverage report.
+
+A coverage report may also be generated in a different format for more in-depth exploration. For example, run
+`pytest --cov-report=html` to generate a browser-based report. Then open the `index.html` file from the newly generated
+`htmlcov` folder to browse coverage results.
+
+## Manual Testing
+
+Run `habitline debug seed` to fill the database with fixtures for manual testing. This will clear any existing data and
+fill the database with tracking data for 6 predefined habits over a course of 4 weeks. The data will be generated with
+reference to the current date at the time of seeding - for example, the most recent completion of the habit "Journal"
+will be on the date when the seeding command was run.
