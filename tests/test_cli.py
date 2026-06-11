@@ -8,7 +8,7 @@ from pytest_mock import MockerFixture
 
 from habitline.analytics import HabitAnalysis, AnalysisRange, AggregateAnalysis
 from habitline.cli import cli, represent_habit, parse_identifier_input, OrderOption, CLI_OUTPUT_SEPARATOR, \
-    represent_aggregate_analysis
+    represent_aggregate_analysis, DEFAULT_DB_PATH
 from habitline.repository import Periodicity, HabitNameTakenException, HabitIdentifier, HabitNotFoundException, Habit
 from habitline.util import maybe_pluralise
 from tests.conftest import make_mock_analysis, MOCK_NOW
@@ -233,10 +233,34 @@ class TestCLI:
     Tests the CLI layer with unit tests.
     """
 
-    def test_cli(self, runner: CliRunner, mock_connection: Mock, patched_get_connection: Mock,
-                 patched_create_service: Mock):
+    def test_cli_default_path(self, runner: CliRunner, mock_connection: Mock, patched_get_connection: Mock,
+                              patched_create_service: Mock):
         """
-        Tests the base command group that is responsible for obtaining the database connection.
+        Tests the base command group that is responsible for obtaining the database connection, without providing a
+        custom path.
+
+        :param runner: CLI runner.
+        :param mock_connection: Mock database connection.
+        :param patched_get_connection: Patched get_connection function.
+        :param patched_create_service: Patched habit service class.
+        :return: Nothing.
+        """
+        expected_path = DEFAULT_DB_PATH
+
+        # Have to invoke a subcommand because invoking the main group (cli) without subcommands just skips the command
+        # and prints help.
+        runner.invoke(cli, make_args(base="list"))
+
+        patched_get_connection.assert_called_once_with(expected_path)
+        patched_create_service.assert_called_once_with(patched_get_connection.return_value)
+        # Cleanup after command execution.
+        mock_connection.close.assert_called_once()
+
+    def test_cli_path_arg(self, runner: CliRunner, mock_connection: Mock, patched_get_connection: Mock,
+                          patched_create_service: Mock):
+        """
+        Tests the base command group that is responsible for obtaining the database connection, with a custom path
+        provided through command options.
 
         :param runner: CLI runner.
         :param mock_connection: Mock database connection.
@@ -246,13 +270,30 @@ class TestCLI:
         """
         path = "lorem_ipsum.db"
 
-        # Have to invoke a subcommand because invoking the main group (cli) without subcommands just skips the command
-        # and prints help.
         runner.invoke(cli, make_args(path=path, base="list"))
 
         patched_get_connection.assert_called_once_with(path)
         patched_create_service.assert_called_once_with(patched_get_connection.return_value)
-        # Cleanup after command execution.
+        mock_connection.close.assert_called_once()
+
+    def test_cli_path_env(self, runner: CliRunner, mock_connection: Mock, patched_get_connection: Mock,
+                          patched_create_service: Mock):
+        """
+        Tests the base command group that is responsible for obtaining the database connection, with a custom path
+        provided through an environment variable.
+
+        :param runner: CLI runner.
+        :param mock_connection: Mock database connection.
+        :param patched_get_connection: Patched get_connection function.
+        :param patched_create_service: Patched habit service class.
+        :return: Nothing.
+        """
+        path = "lorem_ipsum.db"
+
+        runner.invoke(cli, make_args(base="list"), env={"HABITLINE_PATH": path})
+
+        patched_get_connection.assert_called_once_with(path)
+        patched_create_service.assert_called_once_with(patched_get_connection.return_value)
         mock_connection.close.assert_called_once()
 
     def test_create_failure_name_taken(self, runner: CliRunner, patched_get_connection: Mock, mock_service: Mock,
