@@ -208,6 +208,7 @@ class HabitRepository:
             raise HabitNotFoundException(identifier)
         self.__connection.execute("INSERT INTO completion (habit_id, completed_at) VALUES (?, ?)",
                                   (habit_id, datetime_to_stored(completed_at)))
+        self.__connection.commit()
 
     def __get_habit_id(self, identifier: HabitIdentifier) -> int | None:
         """
