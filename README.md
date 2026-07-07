@@ -13,16 +13,28 @@ The project is developed for a course at the [International University of Applie
   the calculations of the streak (becomes "streak by the end of the range"), longest streak, and failure rate.
 - Aggregate analysis of the habit collection.
 
-# Technology Stack
+## Technology Stack
 
 - Click for CLI implementation.
 - sqlite3 for database interactions.
 - SQLite for persistence.
 - pytest for testing.
 
-# Running the Application
+## Typical Workflow Example
 
-## As a Regular CLI Tool
+- Run `habitline create` to create a new habit with a given name and periodicity.
+- Run `habitline complete` with the exact habit name in order to log a completion for the specified habit.
+- Run `habitline list` to view your habits. Supports multiple filters, different sorting orders, and analytics time
+  range restrictions.
+
+![Typical workflow screenshot](media/workflow.png)
+
+Additional information on the provided features can be obtained by running any of the available commands, including the
+root `habitline` command, with the `--help` flag.
+
+## Running the Application
+
+### As a Regular CLI Tool
 
 - Have Python installed. Minimum version - 3.11.
 - Clone the repository and navigate into its folder.
@@ -30,7 +42,7 @@ The project is developed for a course at the [International University of Applie
 - Start a new terminal session. The CLI tool should now be installed.
 - Run `habitline` or `habitline --help` to print help about commands.
 
-## As a Developer
+### As a Developer
 
 - Have Python installed. Minimum version - 3.11.
 - Clone the repository and navigate into its folder.
@@ -40,19 +52,24 @@ The project is developed for a course at the [International University of Applie
   for testing.
 - Run `habitline` or `habitline --help` to print help about commands.
 
-# Testing the Application
+## Testing the Application
 
-## Automated Testing
+### Automated Testing
 
 Run `pytest` after installing the development version. This will run all test cases and a coverage report.
 
 A coverage report may also be generated in a different format for more in-depth exploration. For example, run
-`pytest --cov-report=html` to generate a browser-based report. Then open the `index.html` file from the newly generated
-`htmlcov` folder to browse coverage results.
+`pytest --cov-report=html` to generate a browser-based report. This report can be viewed by opening the `index.html`
+file from the newly generated `htmlcov` folder.
 
-## Manual Testing
+### Manual Testing
 
 Run `habitline debug seed` to fill the database with fixtures for manual testing. This will clear any existing data and
 fill the database with tracking data for 6 predefined habits over a course of 4 weeks. The data will be generated with
 reference to the current date at the time of seeding - for example, the most recent completion of the habit "Journal"
 will be on the date when the seeding command was run.
+
+### Current Test Status
+
+As of the latest application version, 100% coverage with unit tests is achieved and all tests
+pass: ![Coverage report and test results](media/test_results.png)
