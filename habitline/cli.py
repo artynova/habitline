@@ -21,7 +21,8 @@ CLI_OUTPUT_SEPARATOR = "-" * 20
 
 
 @click.group(help="A simple CLI application for managing, tracking, and analysing habits.")
-@click.option("--path", envvar="HABITLINE_PATH", default=DEFAULT_DB_PATH, help="Specify custom database file path. Can also be provided through the HABITLINE_PATH environment variable.",
+@click.option("--path", envvar="HABITLINE_PATH", default=DEFAULT_DB_PATH,
+              help="Specify custom database file path. Can also be provided through the HABITLINE_PATH environment variable.",
               type=click.Path())
 @click.pass_context
 def cli(context: click.Context, path: str):
@@ -300,7 +301,8 @@ def make_habit_order(option: OrderOption, asc: bool) -> HabitAnalysisOrder:
             return HabitAnalysisOrder.by_created_at(asc)
 
 
-@cli.command("list", help="View a list of multiple habits.")
+@cli.command("list",
+             help="View a list of multiple habits.\n\nWhen streaks of habits with different periodicities are compared, the tool compares the numbers of periods. For example, a daily habit with a streak of 3 days has a longer streak than a weekly habit with a streak of 2 weeks.")
 @click.option("--periodicity", type=click.Choice(Periodicity, case_sensitive=False),
               help="Filter habits to those with given periodicity.")
 @click.option("--pending/--completed", "pending", is_flag=True, default=None,
@@ -353,7 +355,8 @@ def represent_aggregate_analysis(analysis: AggregateAnalysis, analysis_limited: 
         f"Average failure rate{analysis_limited_extra_text}:\t\t{format_percentage(analysis.avg_failure_rate)}"
 
 
-@cli.command(help="Generate aggregate analysis of multiple habits.")
+@cli.command(
+    help="Generate aggregate analysis of multiple habits.\n\nWhen streaks of habits with different periodicities are compared, the tool compares the numbers of periods. For example, a daily habit with a streak of 3 days has a longer streak than a weekly habit with a streak of 2 weeks.")
 @click.option("--periodicity", type=click.Choice(Periodicity, case_sensitive=False),
               help="Filter habits to those with given periodicity.")
 @click.option("--pending/--completed", "pending", is_flag=True, default=None,
@@ -389,7 +392,7 @@ def analyse(connection: Connection, periodicity: Periodicity | None, pending: bo
 
 
 @cli.group(help="Special debugging commands, not for regular usage.")
-def debug(): # pragma: no cover
+def debug():  # pragma: no cover
     """
     Does nothing, serves as the Click command group for debug commands.
 
@@ -401,7 +404,7 @@ def debug(): # pragma: no cover
 @debug.command(
     help="Fill the database with predefined habits that have example tracking data, clearing any previous application data.")
 @pass_connection
-def seed(connection: Connection): # pragma: no cover
+def seed(connection: Connection):  # pragma: no cover
     """
     Seeds the database with predefined example habits for manual testing purposes.
     Clears any other application data from the database.
