@@ -5,6 +5,7 @@ from typing import Callable, TypeVar
 
 import click
 from click import ClickException, BadParameter
+from importlib.metadata import version
 
 from fixtures.seed import make_test_habits, insert_raw, clear_database
 from habitline.analytics import AnalysisRange, HabitAnalysisFilter, HabitAnalysisOrder, HabitAnalysis, AggregateAnalysis
@@ -13,6 +14,7 @@ from habitline.repository import HabitIdentifier, Periodicity, HabitRepositoryEx
 from habitline.service import HabitService
 from habitline.util import maybe_pluralise
 
+VERSION = version("habitline")
 DEFAULT_DB_PATH = "database.db"
 
 pass_connection = click.make_pass_decorator(Connection)
@@ -20,7 +22,7 @@ pass_connection = click.make_pass_decorator(Connection)
 CLI_OUTPUT_SEPARATOR = "-" * 20
 
 
-@click.group(help="A simple CLI application for managing, tracking, and analysing habits.")
+@click.group(help=f"A simple CLI application for managing, tracking, and analysing habits.\n\nVersion {VERSION}.")
 @click.option("--path", envvar="HABITLINE_PATH", default=DEFAULT_DB_PATH,
               help="Specify custom database file path. Can also be provided through the HABITLINE_PATH environment variable.",
               type=click.Path())
